@@ -1,0 +1,36 @@
+{
+  "name": "alpha-clean-backend",
+  "version": "1.0.0",
+  "description": "Backend do Alpha Clean para agendamentos de lavagem",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "lint": "echo \"No lint configured\"",
+    "test": "echo \"No tests configured\""
+  },
+  "keywords": [
+    "express",
+    "backend",
+    "alpha-clean",
+    "pwa",
+    "lavagem",
+    "agendamento"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "pg": "^8.16.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "watch": [
+    "app.js",
+    "src/routes",
+    "src/controllers",
+    "src/services",
+    "src/middlewares",
+    "src/utils",
+    "src/database"
+  ],
+  "ext": "js,json",
+  "ignore": ["node_modules", ".git", "public", "logs", "coverage"],
+  "exec": "node --enable-source-maps app.js",
+  "delay": "200",
+  "legacyWatch": true,
+  "signal": "SIGTERM",
+  "env": {
+    "NODE_ENV": "development",
+    "PORT": "3001",
+
+    "DATABASE_URL": "postgresql://postgres.zodovxbovchdjdgdpjtg:%40Alpha%231234%25@aws-1-sa-east-1.pooler.supabase.com:6543/postgres",
+    "DB_SSL": "true",
+    "PGSSLMODE": "require",
+
+    "CORS_ORIGINS": "http://localhost:3000,http://127.0.0.1:3000",
+
+    "JWT_SECRET": "dev-only-change-me",
+    "JWT_EXPIRES_IN": "3600",
+
+    "SLOT_OPEN": "08:00",
+    "SLOT_CLOSE": "18:00",
+    "SLOT_MINUTES": "30",
+    "SLOT_CAPACITY": "1"
+  }
+}
