@@ -29,7 +29,7 @@
 
     "SLOT_OPEN": "08:00",
     "SLOT_CLOSE": "18:00",
-    "SLOT_MINUTES": "30",
+    "SLOT_MINUTES": "50",
     "SLOT_CAPACITY": "1"
   }
 }

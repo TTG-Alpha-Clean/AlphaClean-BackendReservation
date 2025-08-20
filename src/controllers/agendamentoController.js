@@ -1,6 +1,7 @@
+// src/controllers/agendamentoController.js
 import asyncHandler from "../utils/asyncHandler.js";
 import * as svc from "../services/agendamentoService.js";
-import { assertCreatePayload, assertReschedulePayload, assertStatusPayload } from "../utils/validators.js";
+import { assertCreatePayload, assertReschedulePayload, assertStatusPayload, assertUpdatePayload } from "../utils/validators.js";
 
 export const getDailySlots = asyncHandler(async (req, res) => {
     const { data } = req.query;
@@ -40,6 +41,14 @@ export const create = asyncHandler(async (req, res) => {
     res.status(201).json(created);
 });
 
+// ✅ NOVA ROTA: Edição completa do agendamento
+export const updateAgendamento = asyncHandler(async (req, res) => {
+    const payload = assertUpdatePayload(req.body);
+    const updated = await svc.updateAgendamento(req.params.id, req.user, payload);
+    res.json(updated);
+});
+
+// ✅ MANTIDA: Reagendar (só data/horário)
 export const reschedule = asyncHandler(async (req, res) => {
     const data = assertReschedulePayload(req.body);
     const updated = await svc.reschedule(req.params.id, req.user, data);

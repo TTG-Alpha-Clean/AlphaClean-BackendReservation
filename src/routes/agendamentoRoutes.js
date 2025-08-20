@@ -1,3 +1,4 @@
+// src/routes/agendamentoRoutes.js
 import { Router } from "express";
 import { requireUser } from "../middlewares/auth.js";
 import * as ctrl from "../controllers/agendamentoController.js";
@@ -14,7 +15,14 @@ router.get("/slots", ctrl.getDailySlots);
 router.get("/", ctrl.list);
 router.get("/:id", ctrl.getById);
 router.post("/", ctrl.create);
+
+// ✅ NOVA ROTA: Edição completa do agendamento
+router.put("/:id", ctrl.updateAgendamento);
+
+// ✅ MANTIDA: Reagendamento (só data/horário) 
 router.patch("/:id/reagendar", ctrl.reschedule);
+
+// Outras ações
 router.patch("/:id/status", ctrl.updateStatus);
 router.delete("/:id", ctrl.cancel);
 

@@ -129,7 +129,7 @@ export async function create(payload) {
         throw new ApiError(409, "Horário esgotado");
     }
 
-    // evita duplicidade do mesmo usuário no mesmo slot
+    // evita duplicidade do mesmo usuário no mesmo slot (apenas agendamentos ativos)
     const dupQ = `
     SELECT 1 FROM agendamentos
     WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
@@ -137,7 +137,17 @@ export async function create(payload) {
     LIMIT 1
   `;
     const { rowCount: dup } = await pool.query(dupQ, [usuario_id, data, horario]);
-    if (dup) throw new ApiError(409, "Você já possui um agendamento neste horário");
+    if (dup) throw new ApiError(409, "Você já possui um agendamento ativo neste horário");
+
+    // CORREÇÃO: Verifica placa duplicada apenas em agendamentos ativos
+    const plateCheckQ = `
+    SELECT 1 FROM agendamentos
+    WHERE placa = $1 AND data = $2
+      AND status IN ('agendado','em_andamento')
+    LIMIT 1
+  `;
+    const { rowCount: plateExists } = await pool.query(plateCheckQ, [plate, data]);
+    if (plateExists) throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
 
     const insert = `
     INSERT INTO agendamentos (usuario_id, modelo_veiculo, cor, placa, servico, data, horario, observacoes)
@@ -197,5 +207,94 @@ export async function updateStatus(id, user, newStatus) {
     RETURNING *
   `;
     const { rows } = await pool.query(upd, [newStatus, id]);
+    return rows[0];
+}
+
+// ✅ NOVA FUNÇÃO: Edição completa do agendamento
+export async function updateAgendamento(id, user, payload) {
+    const ag = await findById(id);
+    assertOwnershipOrAdmin(ag, user);
+
+    // Só permite editar agendamentos com status 'agendado'
+    if (ag.status !== "agendado") {
+        throw new ApiError(400, "Só é possível editar agendamentos com status 'agendado'");
+    }
+
+    // Validação dos campos obrigatórios
+    const {
+        modelo_veiculo,
+        cor,
+        placa,
+        servico,
+        data,
+        horario,
+        observacoes
+    } = payload;
+
+    if (!modelo_veiculo || !placa || !servico || !data || !horario) {
+        throw new ApiError(400, "Campos obrigatórios: modelo_veiculo, placa, servico, data, horario");
+    }
+
+    const plate = sanitizePlate(placa);
+
+    // Validações de horário
+    if (isPastDateTime(data, horario, SCHEDULE.TZ)) {
+        throw new ApiError(400, "Não é possível agendar no passado");
+    }
+
+    const validSlot = buildSlotsOfDay().includes(horario);
+    if (!validSlot) {
+        throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
+    }
+
+    // Só verifica capacidade se mudou data/horário
+    const changedDateTime = ag.data !== data || ag.horario !== horario;
+    if (changedDateTime) {
+        const used = await countAtSlot({ data, horario });
+        if (used >= SCHEDULE.MAX_CONCURRENT) {
+            throw new ApiError(409, "Horário esgotado");
+        }
+
+        // Verifica duplicidade do mesmo usuário no novo slot (excluindo o agendamento atual)
+        const dupQ = `
+            SELECT 1 FROM agendamentos
+            WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
+              AND status IN ('agendado','em_andamento')
+              AND id != $4
+            LIMIT 1
+        `;
+        const { rowCount: dup } = await pool.query(dupQ, [ag.usuario_id, data, horario, id]);
+        if (dup) {
+            throw new ApiError(409, "Você já possui um agendamento neste horário");
+        }
+    }
+
+    // Atualiza todos os campos editáveis
+    const updateQuery = `
+        UPDATE agendamentos
+        SET 
+            modelo_veiculo = $1,
+            cor = $2,
+            placa = $3,
+            servico = $4,
+            data = $5,
+            horario = $6::time,
+            observacoes = $7,
+            updated_at = now()
+        WHERE id = $8
+        RETURNING *
+    `;
+
+    const { rows } = await pool.query(updateQuery, [
+        modelo_veiculo,
+        cor || null,
+        plate,
+        servico,
+        data,
+        horario,
+        observacoes || null,
+        id
+    ]);
+
     return rows[0];
 }

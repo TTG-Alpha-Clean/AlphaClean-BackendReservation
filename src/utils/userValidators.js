@@ -1,4 +1,4 @@
-import ApiError from "./ApiError.js"
+import ApiError from "./apiError.js" // Corrigido: importação com 'a' minúsculo
 
 const EMAIL_RX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const DDD_RX = /^[0-9]{2}$/
@@ -11,17 +11,20 @@ export function validateRegister(body) {
     if (!senha || String(senha).length < 6) throw new ApiError(400, "senha deve ter pelo menos 6 caracteres")
 
     let tels = []
-    if (Array.isArray(telefones)) {
-        tels = telefones.map(t => ({
-            ddd: String(t.ddd || ""),
-            numero: String(t.numero || ""),
-            is_whatsapp: !!t.is_whatsapp,
-        }))
+    if (Array.isArray(telefones) && telefones.length > 0) {
+        tels = telefones.filter(t => t.ddd && t.numero) // Filtra telefones vazios
+            .map(t => ({
+                ddd: String(t.ddd || ""),
+                numero: String(t.numero || ""),
+                is_whatsapp: !!t.is_whatsapp,
+            }))
+
         for (const t of tels) {
             if (!DDD_RX.test(t.ddd) || t.ddd === "00") throw new ApiError(400, "DDD inválido")
             if (!NUM_RX.test(t.numero)) throw new ApiError(400, "número inválido (formato 9XXXXXXXX)")
         }
     }
+
     const role = body?.role ? String(body.role).toLowerCase() : undefined; // "admin" ou "user"
     return {
         nome: String(nome).trim(),
@@ -43,4 +46,3 @@ export function validateRole(role) {
     const allowed = ["user", "admin"]
     if (!allowed.includes(role)) throw new ApiError(400, `role inválida. Use: ${allowed.join(", ")}`)
 }
-
