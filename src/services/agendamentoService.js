@@ -1,10 +1,12 @@
+// src/services/agendamentoService.js - CORREÇÃO COMPLETA
+
 import { pool } from "../database/index.js";
 import ApiError from "../utils/apiError.js";
 import { SCHEDULE, buildSlotsOfDay } from "../utils/scheduleConfig.js";
 import { isPastDateTime, sanitizePlate } from "../utils/validators.js";
 import { canTransition, isTerminalStatus } from "../utils/statusMachine.js";
 
-// ajuda: converte status=csv em array e filtra vazio
+// ✅ Função que estava faltando
 function parseStatusFilter(status) {
     if (!status) return null;
     const arr = Array.isArray(status) ? status : String(status).split(",").map(s => s.trim());
@@ -61,38 +63,99 @@ export async function getDailySlots({ data }) {
     return { data, slots };
 }
 
-export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20 }) {
+// ✅ Função corrigida para incluir dados do cliente quando admin
+export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20, isAdmin = false }) {
     const where = [];
     const params = [];
     let i = 1;
 
-    if (usuario_id) { where.push(`usuario_id = $${i++}`); params.push(usuario_id); }
-    if (data_ini) { where.push(`data >= $${i++}`); params.push(data_ini); }
-    if (data_fim) { where.push(`data <= $${i++}`); params.push(data_fim); }
+    if (usuario_id) {
+        where.push(`a.usuario_id = $${i++}`);
+        params.push(usuario_id);
+    }
+    if (data_ini) {
+        where.push(`a.data >= $${i++}`);
+        params.push(data_ini);
+    }
+    if (data_fim) {
+        where.push(`a.data <= $${i++}`);
+        params.push(data_fim);
+    }
 
     const statusArr = parseStatusFilter(status);
     if (statusArr?.length) {
-        where.push(`status = ANY($${i++})`);
+        where.push(`a.status = ANY($${i++})`);
         params.push(statusArr);
     }
 
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereSQL = where.length ? ` WHERE ${where.join(" AND ")}` : "";
     const offset = (page - 1) * page_size;
 
-    const q = `
-    SELECT *
-    FROM agendamentos
-    ${whereSQL}
-    ORDER BY data DESC, horario DESC
-    LIMIT ${page_size} OFFSET ${offset}
-  `;
-    const { rows } = await pool.query(q, params);
+    // Query diferente para admin - inclui dados do cliente
+    const baseQuery = isAdmin
+        ? `
+        SELECT 
+            a.*,
+            u.nome as usuario_nome,
+            u.email as usuario_email,
+            (
+                SELECT t.numero 
+                FROM telefones t 
+                WHERE t.usuario_id = u.id 
+                ORDER BY t.is_whatsapp DESC, t.id ASC 
+                LIMIT 1
+            ) as usuario_telefone
+        FROM agendamentos a
+        LEFT JOIN usuarios u ON a.usuario_id = u.id
+        ${whereSQL}
+        ORDER BY a.data DESC, a.horario DESC
+        LIMIT $${i++} OFFSET $${i++}
+        `
+        : `
+        SELECT a.*
+        FROM agendamentos a
+        ${whereSQL}
+        ORDER BY a.data DESC, a.horario DESC
+        LIMIT $${i++} OFFSET $${i++}
+        `;
 
-    const { rows: [{ count }] } = await pool.query(
-        `SELECT COUNT(*)::int AS count FROM agendamentos ${whereSQL}`, params
-    );
+    params.push(page_size, offset);
 
-    return { data: rows, page, page_size, total: count };
+    // Count query também precisa considerar o JOIN para admin
+    const countQuery = isAdmin
+        ? `
+        SELECT COUNT(*)::int AS count
+        FROM agendamentos a
+        LEFT JOIN usuarios u ON a.usuario_id = u.id
+        ${whereSQL}
+        `
+        : `
+        SELECT COUNT(*)::int AS count
+        FROM agendamentos a
+        ${whereSQL}
+        `;
+
+    try {
+        const [dataRes, countRes] = await Promise.all([
+            pool.query(baseQuery, params),
+            pool.query(countQuery, params.slice(0, -2)) // Remove LIMIT e OFFSET do count
+        ]);
+
+        const total = countRes.rows[0]?.count || 0;
+
+        return {
+            data: dataRes.rows,
+            page,
+            page_size,
+            total,
+            total_pages: Math.ceil(total / page_size),
+            has_next: page < Math.ceil(total / page_size),
+            has_prev: page > 1
+        };
+    } catch (error) {
+        console.error("Erro na query de agendamentos:", error);
+        throw new ApiError(500, "Erro ao buscar agendamentos", error);
+    }
 }
 
 export async function getById(id, user) {
@@ -119,17 +182,14 @@ export async function create(payload) {
         throw new ApiError(400, "Não é possível agendar no passado");
     }
 
-    // grade de horários
     const validSlot = buildSlotsOfDay().includes(horario);
     if (!validSlot) throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
 
-    // capacidade do slot
     const used = await countAtSlot({ data, horario });
     if (used >= SCHEDULE.MAX_CONCURRENT) {
         throw new ApiError(409, "Horário esgotado");
     }
 
-    // evita duplicidade do mesmo usuário no mesmo slot (apenas agendamentos ativos)
     const dupQ = `
     SELECT 1 FROM agendamentos
     WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
@@ -139,7 +199,6 @@ export async function create(payload) {
     const { rowCount: dup } = await pool.query(dupQ, [usuario_id, data, horario]);
     if (dup) throw new ApiError(409, "Você já possui um agendamento ativo neste horário");
 
-    // CORREÇÃO: Verifica placa duplicada apenas em agendamentos ativos
     const plateCheckQ = `
     SELECT 1 FROM agendamentos
     WHERE placa = $1 AND data = $2
@@ -210,17 +269,14 @@ export async function updateStatus(id, user, newStatus) {
     return rows[0];
 }
 
-// ✅ NOVA FUNÇÃO: Edição completa do agendamento
 export async function updateAgendamento(id, user, payload) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    // Só permite editar agendamentos com status 'agendado'
     if (ag.status !== "agendado") {
         throw new ApiError(400, "Só é possível editar agendamentos com status 'agendado'");
     }
 
-    // Validação dos campos obrigatórios
     const {
         modelo_veiculo,
         cor,
@@ -237,7 +293,6 @@ export async function updateAgendamento(id, user, payload) {
 
     const plate = sanitizePlate(placa);
 
-    // Validações de horário
     if (isPastDateTime(data, horario, SCHEDULE.TZ)) {
         throw new ApiError(400, "Não é possível agendar no passado");
     }
@@ -247,7 +302,6 @@ export async function updateAgendamento(id, user, payload) {
         throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
     }
 
-    // Só verifica capacidade se mudou data/horário
     const changedDateTime = ag.data !== data || ag.horario !== horario;
     if (changedDateTime) {
         const used = await countAtSlot({ data, horario });
@@ -255,7 +309,6 @@ export async function updateAgendamento(id, user, payload) {
             throw new ApiError(409, "Horário esgotado");
         }
 
-        // Verifica duplicidade do mesmo usuário no novo slot (excluindo o agendamento atual)
         const dupQ = `
             SELECT 1 FROM agendamentos
             WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
@@ -269,7 +322,6 @@ export async function updateAgendamento(id, user, payload) {
         }
     }
 
-    // Atualiza todos os campos editáveis
     const updateQuery = `
         UPDATE agendamentos
         SET 

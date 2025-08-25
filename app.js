@@ -1,4 +1,4 @@
-// app.js
+// app.js - ADICIONAR ROTAS DE SERVIÇOS
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -12,11 +12,11 @@ import { pool } from "./src/database/index.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import agendamentosRoutes from "./src/routes/agendamentoRoutes.js";
+import servicosRoutes from "./src/routes/servicoRoutes.js"; // ✅ NOVA ROTA
 
 // middlewares
 import notFound from "./src/middlewares/notFound.js";
 import errorHandler from "./src/middlewares/errorHandler.js";
-
 
 // ===== CORS (com credenciais) =====
 const DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"];
@@ -50,6 +50,7 @@ app.use(cookieParser());
 app.use("/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/agendamentos", agendamentosRoutes);
+app.use("/api/servicos", servicosRoutes); // ✅ NOVA ROTA
 
 app.use(notFound);
 app.use(errorHandler);

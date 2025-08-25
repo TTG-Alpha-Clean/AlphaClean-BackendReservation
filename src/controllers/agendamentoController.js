@@ -10,9 +10,12 @@ export const getDailySlots = asyncHandler(async (req, res) => {
     res.json(result);
 });
 
+// src/controllers/agendamentoController.js - ATUALIZAÇÃO
+
 export const list = asyncHandler(async (req, res) => {
     const { status, data_ini, data_fim, usuario_id, page = 1, page_size = 20 } = req.query;
     const isAdmin = req.user.role === "admin";
+
     const filter = {
         status,
         data_ini,
@@ -20,13 +23,16 @@ export const list = asyncHandler(async (req, res) => {
         usuario_id: isAdmin ? usuario_id || null : req.user.id, // user comum só enxerga os seus
         page: Number(page),
         page_size: Math.min(Number(page_size), 100),
+        isAdmin, // ✅ Passa flag de admin para incluir dados do cliente
     };
+
     const result = await svc.list(filter);
     res.json(result);
 });
 
 export const getById = asyncHandler(async (req, res) => {
-    const ag = await svc.getById(req.params.id, req.user);
+    // ✅ Usa nova função que inclui dados do cliente para admin
+    const ag = await svc.getByIdWithClientInfo(req.params.id, req.user);
     if (!ag) return res.status(404).json({ error: "Agendamento não encontrado" });
     res.json(ag);
 });
