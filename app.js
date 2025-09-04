@@ -7,7 +7,6 @@ import morgan from "morgan";
 
 import cookieParser from "./src/middlewares/cookieParser.js";
 import { pool } from "./src/database/index.js";
-import { startAutoFinalizeScheduler } from "./src/services/autoFinalize.js";
 
 // rotas
 import authRoutes from "./src/routes/authRoutes.js";
@@ -80,12 +79,6 @@ app.get("/ping", async (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
-
-    // Iniciar sistema de finalização automática
-    console.log("Iniciando sistema de finalização automática...");
-    startAutoFinalizeScheduler();
-
-    console.log("Sistema pronto!");
 });
 
 export default app;

@@ -1,10 +1,9 @@
-// src/services/agendamentoService.js - ATUALIZADO COM FINALIZAÇÃO AUTOMÁTICA
+// src/services/agendamentoService.js - VERSÃO SIMPLIFICADA SEM LÓGICA AUTOMÁTICA
 
 import { pool } from "../database/index.js";
 import ApiError from "../utils/apiError.js";
-import { autoFinalizeAppointments } from "./autoFinalize.js";
 
-// Configurações de horários (substitua por suas configurações reais)
+// Configurações de horários
 const SCHEDULE = {
     OPEN: "08:00",
     CLOSE: "18:00",
@@ -51,19 +50,25 @@ export function sanitizePlate(placa) {
     return String(placa).toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-function canTransition(currentStatus, newStatus) {
+// ✅ NOVA LÓGICA SIMPLIFICADA DE TRANSIÇÕES
+function canTransition(currentStatus, newStatus, userRole) {
+    // Para clientes - podem cancelar agendamentos
+    if (userRole !== "admin") {
+        return currentStatus === "agendado" && newStatus === "cancelado";
+    }
+
+    // Para admins - controle total
     const transitions = {
-        'agendado': ['em_andamento', 'cancelado'],
-        'em_andamento': ['finalizado', 'cancelado'], // Alterado de 'concluido' para 'finalizado'
-        'finalizado': [],
-        'cancelado': [],
-        'reagendado': []
+        'agendado': ['cancelado', 'finalizado'],
+        'cancelado': [], // Status final
+        'finalizado': [] // Status final
     };
+
     return transitions[currentStatus]?.includes(newStatus) || false;
 }
 
 function isTerminalStatus(status) {
-    return ['finalizado', 'cancelado'].includes(status); // Alterado de 'concluido' para 'finalizado'
+    return ['finalizado', 'cancelado'].includes(status);
 }
 
 // Regras auxiliares
@@ -73,7 +78,7 @@ async function countAtSlot({ data, horario }) {
         FROM agendamentos
         WHERE data = $1
           AND horario = $2::time
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
     `;
     const { rows } = await pool.query(q, [data, horario]);
     return rows[0]?.total || 0;
@@ -91,13 +96,13 @@ function assertOwnershipOrAdmin(ag, user) {
     }
 }
 
-// API pública
+// ===== API PÚBLICA =====
+
 export async function getDailySlots({ data }) {
-    // Executa finalização automática antes de verificar slots
-    await autoFinalizeAppointments();
+    // ✅ REMOVIDO: autoFinalizeAppointments() - sem lógica automática
 
     const { rows } = await pool.query(
-        `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','em_andamento'))::int AS ocupados
+        `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','finalizado'))::int AS ocupados
          FROM agendamentos
          WHERE data = $1 AND servico_id IS NOT NULL
          GROUP BY horario
@@ -120,8 +125,7 @@ export async function getDailySlots({ data }) {
 }
 
 export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20, isAdmin = false }) {
-    // Executa finalização automática antes de listar
-    await autoFinalizeAppointments();
+    // ✅ REMOVIDO: autoFinalizeAppointments() - sem lógica automática
 
     const where = [];
     const params = [];
@@ -180,42 +184,35 @@ export async function list({ status, data_ini, data_fim, usuario_id, page = 1, p
     params.push(page_size, offset);
 
     const countQuery = `
-        SELECT COUNT(*)::int AS count
+        SELECT COUNT(*)::int AS total
         FROM agendamentos a
         ${whereSQL}
     `;
+    const countParams = params.slice(0, -2); // Remove LIMIT e OFFSET
 
-    try {
-        const [dataRes, countRes] = await Promise.all([
-            pool.query(baseQuery, params),
-            pool.query(countQuery, params.slice(0, -2))
-        ]);
+    const [dataResult, countResult] = await Promise.all([
+        pool.query(baseQuery, params),
+        pool.query(countQuery, countParams)
+    ]);
 
-        const total = countRes.rows[0]?.count || 0;
+    const totalItems = countResult.rows[0]?.total || 0;
+    const totalPages = Math.ceil(totalItems / page_size);
 
-        return {
-            data: dataRes.rows,
+    return {
+        data: dataResult.rows,
+        pagination: {
             page,
             page_size,
-            total,
-            total_pages: Math.ceil(total / page_size),
-            has_next: page < Math.ceil(total / page_size),
+            total_items: totalItems,
+            total_pages: totalPages,
+            has_next: page < totalPages,
             has_prev: page > 1
-        };
-    } catch (error) {
-        console.error("Erro na query de agendamentos:", error);
-        throw new ApiError(500, "Erro ao buscar agendamentos", error);
-    }
-}
-
-export async function getById(id, user) {
-    const ag = await findById(id);
-    assertOwnershipOrAdmin(ag, user);
-    return ag;
+        }
+    };
 }
 
 export async function getByIdWithClientInfo(id, user) {
-    const isAdmin = user.role === "admin";
+    const isAdmin = user?.role === "admin";
 
     const query = isAdmin
         ? `
@@ -246,6 +243,43 @@ export async function getByIdWithClientInfo(id, user) {
     if (!rows[0]) return null;
 
     return rows[0];
+}
+
+// ✅ NOVA FUNÇÃO: Exclusão de agendamentos
+export async function deleteAgendamento(id, user) {
+    const ag = await findById(id);
+    assertOwnershipOrAdmin(ag, user);
+
+    // Verificar se o agendamento pode ser excluído
+    const canDelete = user.role === "admin"
+        ? ['cancelado', 'finalizado'].includes(ag.status)  // Admin pode excluir cancelados e finalizados
+        : ag.status === 'cancelado';                       // Cliente só pode excluir cancelados
+
+    if (!canDelete) {
+        const allowedStatuses = user.role === "admin"
+            ? "cancelados ou finalizados"
+            : "cancelados";
+        throw new ApiError(400, `Só é possível excluir agendamentos ${allowedStatuses}`);
+    }
+
+    // Excluir o agendamento do banco de dados
+    const deleteQuery = `
+        DELETE FROM agendamentos 
+        WHERE id = $1 
+        RETURNING id, status, modelo_veiculo, data, horario
+    `;
+
+    const { rows } = await pool.query(deleteQuery, [id]);
+
+    if (!rows[0]) {
+        throw new ApiError(404, "Agendamento não encontrado");
+    }
+
+    return {
+        deleted: true,
+        agendamento: rows[0],
+        message: "Agendamento excluído com sucesso"
+    };
 }
 
 export async function create(payload) {
@@ -287,7 +321,7 @@ export async function create(payload) {
     const dupQ = `
         SELECT 1 FROM agendamentos
         WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
         LIMIT 1
     `;
     const { rowCount: dup } = await pool.query(dupQ, [usuario_id, data, horario]);
@@ -296,55 +330,60 @@ export async function create(payload) {
     const plateCheckQ = `
         SELECT 1 FROM agendamentos
         WHERE placa = $1 AND data = $2
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
         LIMIT 1
     `;
     const { rowCount: plateExists } = await pool.query(plateCheckQ, [plate, data]);
-    if (plateExists) throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
+    if (plateExists) throw new ApiError(409, "Esta placa já possui agendamento neste dia");
 
-    const insert = `
-        INSERT INTO agendamentos (usuario_id, modelo_veiculo, cor, placa, servico_id, data, horario, observacoes, status)
+    const ins = `
+        INSERT INTO agendamentos (
+            usuario_id, modelo_veiculo, cor, placa,
+            servico_id, data, horario, observacoes, status
+        )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'agendado')
         RETURNING *
     `;
 
-    const { rows } = await pool.query(insert, [
-        usuario_id, modelo_veiculo, cor, plate, servico_id, data, horario, observacoes
+    const { rows } = await pool.query(ins, [
+        usuario_id, modelo_veiculo, cor, plate,
+        servico_id, data, horario, observacoes
     ]);
 
-    // Retornar com dados do serviço
-    return {
-        ...rows[0],
-        servico_nome: servicoRows[0].nome,
-        servico_valor: servicoRows[0].valor,
-    };
+    return rows[0];
 }
 
 export async function reschedule(id, user, { data, horario }) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    if (isTerminalStatus(ag.status)) {
-        throw new ApiError(400, "Agendamentos finalizados ou cancelados não podem ser reagendados");
-    }
     if (ag.status !== "agendado") {
-        throw new ApiError(400, "Só é possível reagendar quando o status é 'agendado'");
+        throw new ApiError(400, "Só é possível reagendar agendamentos com status 'agendado'");
     }
+
     if (isPastDateTime(data, horario)) {
         throw new ApiError(400, "Não é possível reagendar para o passado");
     }
 
     const validSlot = buildSlotsOfDay().includes(horario);
-    if (!validSlot) throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
+    if (!validSlot) throw new ApiError(400, "Horário fora do expediente");
 
-    const used = await countAtSlot({ data, horario });
-    if (used >= SCHEDULE.MAX_CONCURRENT) {
-        throw new ApiError(409, "Horário esgotado");
+    // Verificar disponibilidade (excluindo o próprio agendamento)
+    const conflictQ = `
+        SELECT COUNT(*)::int AS total FROM agendamentos
+        WHERE data = $1 AND horario = $2::time AND id != $3
+          AND status IN ('agendado','finalizado')
+    `;
+    const { rows: conflictRows } = await pool.query(conflictQ, [data, horario, id]);
+    const conflicts = conflictRows[0]?.total || 0;
+
+    if (conflicts >= SCHEDULE.MAX_CONCURRENT) {
+        throw new ApiError(409, "Horário não disponível");
     }
 
     const upd = `
         UPDATE agendamentos
-        SET data = $1, horario = $2::time, updated_at = now()
+        SET data = $1, horario = $2, updated_at = now()
         WHERE id = $3
         RETURNING *
     `;
@@ -356,8 +395,12 @@ export async function updateStatus(id, user, newStatus) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    if (!canTransition(ag.status, newStatus)) {
-        throw new ApiError(400, `Transição de '${ag.status}' para '${newStatus}' não permitida`);
+    // ✅ NOVA VALIDAÇÃO: Usar a função simplificada
+    if (!canTransition(ag.status, newStatus, user.role)) {
+        const transitions = user.role === "admin"
+            ? "admins podem cancelar ou finalizar agendamentos"
+            : "clientes só podem cancelar agendamentos próprios";
+        throw new ApiError(400, `Transição de '${ag.status}' para '${newStatus}' não permitida. ${transitions}.`);
     }
 
     const upd = `
@@ -405,55 +448,29 @@ export async function updateAgendamento(id, user, payload) {
 
     // Verificar disponibilidade (excluindo o próprio agendamento)
     const conflictQ = `
-        SELECT COUNT(*)::int as count
-        FROM agendamentos
-        WHERE data = $1 AND horario = $2::time 
-          AND status IN ('agendado','em_andamento')
-          AND id != $3
+        SELECT COUNT(*)::int AS total FROM agendamentos
+        WHERE data = $1 AND horario = $2::time AND id != $3
+          AND status IN ('agendado','finalizado')
     `;
     const { rows: conflictRows } = await pool.query(conflictQ, [data, horario, id]);
-    if (conflictRows[0].count >= SCHEDULE.MAX_CONCURRENT) {
-        throw new ApiError(409, "Horário esgotado");
+    const conflicts = conflictRows[0]?.total || 0;
+
+    if (conflicts >= SCHEDULE.MAX_CONCURRENT) {
+        throw new ApiError(409, "Horário não disponível");
     }
 
-    // Verificar serviço
-    const { rows: servicoRows } = await pool.query(
-        'SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true',
-        [servico_id]
-    );
-
-    if (!servicoRows[0]) {
-        throw new ApiError(400, "Serviço não encontrado ou inativo");
-    }
-
-    // Verificar duplicata de placa (excluindo o próprio agendamento)
-    const plateDupQ = `
-        SELECT 1 FROM agendamentos
-        WHERE placa = $1 AND data = $2 
-          AND status IN ('agendado','em_andamento')
-          AND id != $3
-        LIMIT 1
-    `;
-    const { rowCount: plateDup } = await pool.query(plateDupQ, [plate, data, id]);
-    if (plateDup) {
-        throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
-    }
-
-    const updateQ = `
+    const upd = `
         UPDATE agendamentos
         SET modelo_veiculo = $1, cor = $2, placa = $3, servico_id = $4,
-            data = $5, horario = $6::time, observacoes = $7, updated_at = now()
+            data = $5, horario = $6, observacoes = $7, updated_at = now()
         WHERE id = $8
         RETURNING *
     `;
 
-    const { rows } = await pool.query(updateQ, [
-        modelo_veiculo, cor, plate, servico_id, data, horario, observacoes, id
+    const { rows } = await pool.query(upd, [
+        modelo_veiculo, cor, plate, servico_id,
+        data, horario, observacoes, id
     ]);
 
-    return {
-        ...rows[0],
-        servico_nome: servicoRows[0].nome,
-        servico_valor: servicoRows[0].valor,
-    };
+    return rows[0];
 }

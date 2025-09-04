@@ -1,8 +1,10 @@
+// src/utils/statusMachine.js - VERSÃO SIMPLIFICADA SEM EM_ANDAMENTO
+
+// ✅ TRANSIÇÕES SIMPLIFICADAS - APENAS 3 STATUS
 const transitions = {
-    agendado: new Set(["em_andamento", "cancelado"]),
-    em_andamento: new Set(["finalizado", "cancelado"]),
-    finalizado: new Set([]),
-    cancelado: new Set([]),
+    agendado: new Set(["cancelado", "finalizado"]),
+    cancelado: new Set([]), // Status final
+    finalizado: new Set([]), // Status final
 };
 
 export function canTransition(from, to) {
@@ -12,4 +14,22 @@ export function canTransition(from, to) {
 
 export function isTerminalStatus(st) {
     return st === "finalizado" || st === "cancelado";
+}
+
+// ✅ FUNÇÃO PARA VALIDAR PERMISSÕES POR ROLE
+export function canUserChangeStatus(currentStatus, newStatus, userRole) {
+    // Clientes só podem cancelar seus próprios agendamentos
+    if (userRole !== "admin") {
+        return currentStatus === "agendado" && newStatus === "cancelado";
+    }
+
+    // Admins podem fazer qualquer transição válida
+    return canTransition(currentStatus, newStatus);
+}
+
+// ✅ STATUS VÁLIDOS DO SISTEMA
+export const VALID_STATUS = ["agendado", "cancelado", "finalizado"];
+
+export function isValidStatus(status) {
+    return VALID_STATUS.includes(status);
 }
