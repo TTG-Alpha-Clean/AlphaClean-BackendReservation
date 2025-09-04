@@ -1,4 +1,4 @@
-// app.js - ADICIONAR ROTAS DE SERVIÇOS
+// app.js - COM FINALIZAÇÃO AUTOMÁTICA DE AGENDAMENTOS
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -7,12 +7,13 @@ import morgan from "morgan";
 
 import cookieParser from "./src/middlewares/cookieParser.js";
 import { pool } from "./src/database/index.js";
+import { startAutoFinalizeScheduler } from "./src/services/autoFinalize.js";
 
 // rotas
 import authRoutes from "./src/routes/authRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import agendamentosRoutes from "./src/routes/agendamentoRoutes.js";
-import servicosRoutes from "./src/routes/servicoRoutes.js"; // ✅ NOVA ROTA
+import servicosRoutes from "./src/routes/servicoRoutes.js";
 
 // middlewares
 import notFound from "./src/middlewares/notFound.js";
@@ -50,7 +51,7 @@ app.use(cookieParser());
 app.use("/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/agendamentos", agendamentosRoutes);
-app.use("/api/servicos", servicosRoutes); // ✅ NOVA ROTA
+app.use("/api/servicos", servicosRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -61,6 +62,7 @@ app.get("/health", (req, res) => {
         status: "ok",
         uptime: process.uptime(),
         ts: new Date().toISOString(),
+        autoFinalize: "active",
     });
 });
 
@@ -78,6 +80,12 @@ app.get("/ping", async (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
+
+    // Iniciar sistema de finalização automática
+    console.log("Iniciando sistema de finalização automática...");
+    startAutoFinalizeScheduler();
+
+    console.log("Sistema pronto!");
 });
 
 export default app;

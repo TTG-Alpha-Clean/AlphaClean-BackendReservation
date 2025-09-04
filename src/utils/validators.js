@@ -68,7 +68,7 @@ export function assertReschedulePayload(body) {
 }
 
 export function assertStatusPayload(body) {
-    const allowed = ["agendado", "em_andamento", "concluido", "cancelado", "reagendado"];
+    const allowed = ["agendado", "em_andamento", "finalizado", "cancelado", "reagendado"]; // ✅ Mudou "concluido" para "finalizado"
     if (!body?.status || !allowed.includes(body.status)) {
         throw new ApiError(400, `status inválido. Valores permitidos: ${allowed.join(", ")}`);
     }

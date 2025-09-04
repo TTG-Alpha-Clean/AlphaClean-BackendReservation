@@ -1,7 +1,8 @@
-// src/services/agendamentoService.js - VERSÃO CORRIGIDA COMPLETA
+// src/services/agendamentoService.js - ATUALIZADO COM FINALIZAÇÃO AUTOMÁTICA
 
 import { pool } from "../database/index.js";
 import ApiError from "../utils/apiError.js";
+import { autoFinalizeAppointments } from "./autoFinalize.js";
 
 // Configurações de horários (substitua por suas configurações reais)
 const SCHEDULE = {
@@ -32,7 +33,6 @@ function buildSlotsOfDay() {
     return slots;
 }
 
-// Função que estava faltando
 function parseStatusFilter(status) {
     if (!status) return null;
     const arr = Array.isArray(status) ? status : String(status).split(",").map(s => s.trim());
@@ -54,8 +54,8 @@ export function sanitizePlate(placa) {
 function canTransition(currentStatus, newStatus) {
     const transitions = {
         'agendado': ['em_andamento', 'cancelado'],
-        'em_andamento': ['concluido', 'cancelado'],
-        'concluido': [],
+        'em_andamento': ['finalizado', 'cancelado'], // Alterado de 'concluido' para 'finalizado'
+        'finalizado': [],
         'cancelado': [],
         'reagendado': []
     };
@@ -63,7 +63,7 @@ function canTransition(currentStatus, newStatus) {
 }
 
 function isTerminalStatus(status) {
-    return ['concluido', 'cancelado'].includes(status);
+    return ['finalizado', 'cancelado'].includes(status); // Alterado de 'concluido' para 'finalizado'
 }
 
 // Regras auxiliares
@@ -93,7 +93,9 @@ function assertOwnershipOrAdmin(ag, user) {
 
 // API pública
 export async function getDailySlots({ data }) {
-    // CORRIGIDO: incluir servico_id na busca
+    // Executa finalização automática antes de verificar slots
+    await autoFinalizeAppointments();
+
     const { rows } = await pool.query(
         `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','em_andamento'))::int AS ocupados
          FROM agendamentos
@@ -102,9 +104,6 @@ export async function getDailySlots({ data }) {
          ORDER BY horario`,
         [data]
     );
-
-    // DEBUG: Adicione este log
-    console.log("🔍 Slots ocupados para", data, ":", rows);
 
     const ocupacao = new Map(rows.map(r => [r.horario.slice(0, 5), r.ocupados]));
     const slots = buildSlotsOfDay().map(h => {
@@ -119,7 +118,11 @@ export async function getDailySlots({ data }) {
 
     return { data, slots };
 }
+
 export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20, isAdmin = false }) {
+    // Executa finalização automática antes de listar
+    await autoFinalizeAppointments();
+
     const where = [];
     const params = [];
     let i = 1;
@@ -190,8 +193,6 @@ export async function list({ status, data_ini, data_fim, usuario_id, page = 1, p
 
         const total = countRes.rows[0]?.count || 0;
 
-        console.log("🔍 Dados retornados da query:", dataRes.rows[0]);
-
         return {
             data: dataRes.rows,
             page,
@@ -253,7 +254,7 @@ export async function create(payload) {
         modelo_veiculo,
         cor,
         placa,
-        servico_id, // CORRIGIDO: usar servico_id
+        servico_id,
         data,
         horario,
         observacoes = null
@@ -301,7 +302,6 @@ export async function create(payload) {
     const { rowCount: plateExists } = await pool.query(plateCheckQ, [plate, data]);
     if (plateExists) throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
 
-    // CORRIGIDO: usar servico_id na query
     const insert = `
         INSERT INTO agendamentos (usuario_id, modelo_veiculo, cor, placa, servico_id, data, horario, observacoes, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'agendado')
@@ -382,7 +382,7 @@ export async function updateAgendamento(id, user, payload) {
         modelo_veiculo,
         cor,
         placa,
-        servico_id, // CORRIGIDO: usar servico_id
+        servico_id,
         data,
         horario,
         observacoes
@@ -403,9 +403,22 @@ export async function updateAgendamento(id, user, payload) {
         throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
     }
 
-    // Verificar se o serviço existe
+    // Verificar disponibilidade (excluindo o próprio agendamento)
+    const conflictQ = `
+        SELECT COUNT(*)::int as count
+        FROM agendamentos
+        WHERE data = $1 AND horario = $2::time 
+          AND status IN ('agendado','em_andamento')
+          AND id != $3
+    `;
+    const { rows: conflictRows } = await pool.query(conflictQ, [data, horario, id]);
+    if (conflictRows[0].count >= SCHEDULE.MAX_CONCURRENT) {
+        throw new ApiError(409, "Horário esgotado");
+    }
+
+    // Verificar serviço
     const { rows: servicoRows } = await pool.query(
-        'SELECT id FROM servicos WHERE id = $1 AND ativo = true',
+        'SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true',
         [servico_id]
     );
 
@@ -413,52 +426,34 @@ export async function updateAgendamento(id, user, payload) {
         throw new ApiError(400, "Serviço não encontrado ou inativo");
     }
 
-    const changedDateTime = ag.data !== data || ag.horario !== horario;
-    if (changedDateTime) {
-        const used = await countAtSlot({ data, horario });
-        if (used >= SCHEDULE.MAX_CONCURRENT) {
-            throw new ApiError(409, "Horário esgotado");
-        }
-
-        const dupQ = `
-            SELECT 1 FROM agendamentos
-            WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
-              AND status IN ('agendado','em_andamento')
-              AND id != $4
-            LIMIT 1
-        `;
-        const { rowCount: dup } = await pool.query(dupQ, [ag.usuario_id, data, horario, id]);
-        if (dup) {
-            throw new ApiError(409, "Você já possui um agendamento neste horário");
-        }
+    // Verificar duplicata de placa (excluindo o próprio agendamento)
+    const plateDupQ = `
+        SELECT 1 FROM agendamentos
+        WHERE placa = $1 AND data = $2 
+          AND status IN ('agendado','em_andamento')
+          AND id != $3
+        LIMIT 1
+    `;
+    const { rowCount: plateDup } = await pool.query(plateDupQ, [plate, data, id]);
+    if (plateDup) {
+        throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
     }
 
-    // CORRIGIDO: usar servico_id na query
-    const updateQuery = `
+    const updateQ = `
         UPDATE agendamentos
-        SET 
-            modelo_veiculo = $1,
-            cor = $2,
-            placa = $3,
-            servico_id = $4,
-            data = $5,
-            horario = $6::time,
-            observacoes = $7,
-            updated_at = now()
+        SET modelo_veiculo = $1, cor = $2, placa = $3, servico_id = $4,
+            data = $5, horario = $6::time, observacoes = $7, updated_at = now()
         WHERE id = $8
         RETURNING *
     `;
 
-    const { rows } = await pool.query(updateQuery, [
-        modelo_veiculo,
-        cor || null,
-        plate,
-        servico_id, // CORRIGIDO
-        data,
-        horario,
-        observacoes || null,
-        id
+    const { rows } = await pool.query(updateQ, [
+        modelo_veiculo, cor, plate, servico_id, data, horario, observacoes, id
     ]);
 
-    return await getByIdWithClientInfo(rows[0].id, user);
+    return {
+        ...rows[0],
+        servico_nome: servicoRows[0].nome,
+        servico_valor: servicoRows[0].valor,
+    };
 }
