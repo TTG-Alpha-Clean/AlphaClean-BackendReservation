@@ -1,7 +1,7 @@
-// src/services/agendamentoService.js - VERSÃO SIMPLIFICADA SEM LÓGICA AUTOMÁTICA
-
-import { pool } from "../database/index.js";
-import ApiError from "../utils/apiError.js";
+// src/services/agendamentoService.ts - VERSÃO TYPESCRIPT
+import { pool } from "../database/index";
+import ApiError from "../utils/apiError";
+import { AuthenticatedRequest, Agendamento, TimeSlot, DailySlotsResponse } from "../types/interfaces";
 
 // Configurações de horários
 const SCHEDULE = {
@@ -12,9 +12,55 @@ const SCHEDULE = {
     TZ: "America/Sao_Paulo"
 };
 
+// Interface para filtros de listagem
+interface ListFilters {
+    status?: string;
+    data_ini?: string;
+    data_fim?: string;
+    usuario_id?: string | null;
+    page?: number;
+    page_size?: number;
+    isAdmin?: boolean;
+}
+
+// Interface para criação de agendamento
+interface CreateAgendamentoPayload {
+    usuario_id: string;
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para atualização de agendamento
+interface UpdateAgendamentoPayload {
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para reagendamento
+interface ReschedulePayload {
+    data: string;
+    horario: string;
+}
+
+// Interface para usuário autenticado (simplificada)
+interface AuthUser {
+    id: string;
+    role: 'user' | 'admin';
+}
+
 // Função auxiliar para gerar slots do dia
-function buildSlotsOfDay() {
-    const slots = [];
+function buildSlotsOfDay(): string[] {
+    const slots: string[] = [];
     const [openHour, openMin] = SCHEDULE.OPEN.split(':').map(Number);
     const [closeHour, closeMin] = SCHEDULE.CLOSE.split(':').map(Number);
 
@@ -32,33 +78,33 @@ function buildSlotsOfDay() {
     return slots;
 }
 
-function parseStatusFilter(status) {
+function parseStatusFilter(status?: string): string[] | null {
     if (!status) return null;
     const arr = Array.isArray(status) ? status : String(status).split(",").map(s => s.trim());
     return arr.filter(Boolean);
 }
 
 // Funções auxiliares
-export function isPastDateTime(data, horario) {
+export function isPastDateTime(data: string, horario: string): boolean {
     const agendamento = new Date(`${data}T${horario}:00`);
     const agora = new Date();
     return agendamento < agora;
 }
 
-export function sanitizePlate(placa) {
+export function sanitizePlate(placa: string): string {
     if (!placa) return "";
     return String(placa).toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-// ✅ NOVA LÓGICA SIMPLIFICADA DE TRANSIÇÕES
-function canTransition(currentStatus, newStatus, userRole) {
+// Lógica de transições simplificada
+function canTransition(currentStatus: string, newStatus: string, userRole: string): boolean {
     // Para clientes - podem cancelar agendamentos
     if (userRole !== "admin") {
         return currentStatus === "agendado" && newStatus === "cancelado";
     }
 
     // Para admins - controle total
-    const transitions = {
+    const transitions: Record<string, string[]> = {
         'agendado': ['cancelado', 'finalizado'],
         'cancelado': [], // Status final
         'finalizado': [] // Status final
@@ -67,12 +113,8 @@ function canTransition(currentStatus, newStatus, userRole) {
     return transitions[currentStatus]?.includes(newStatus) || false;
 }
 
-function isTerminalStatus(status) {
-    return ['finalizado', 'cancelado'].includes(status);
-}
-
 // Regras auxiliares
-async function countAtSlot({ data, horario }) {
+async function countAtSlot({ data, horario }: { data: string; horario: string }): Promise<number> {
     const q = `
         SELECT COUNT(*)::int AS total
         FROM agendamentos
@@ -84,12 +126,12 @@ async function countAtSlot({ data, horario }) {
     return rows[0]?.total || 0;
 }
 
-async function findById(id) {
+async function findById(id: string): Promise<any> {
     const { rows } = await pool.query(`SELECT * FROM agendamentos WHERE id = $1`, [id]);
     return rows[0] || null;
 }
 
-function assertOwnershipOrAdmin(ag, user) {
+function assertOwnershipOrAdmin(ag: any, user: AuthUser): void {
     if (!ag) throw new ApiError(404, "Agendamento não encontrado");
     if (user.role !== "admin" && ag.usuario_id !== user.id) {
         throw new ApiError(403, "Você não tem permissão para acessar este agendamento");
@@ -98,9 +140,7 @@ function assertOwnershipOrAdmin(ag, user) {
 
 // ===== API PÚBLICA =====
 
-export async function getDailySlots({ data }) {
-    // ✅ REMOVIDO: autoFinalizeAppointments() - sem lógica automática
-
+export async function getDailySlots({ data }: { data: string }): Promise<DailySlotsResponse> {
     const { rows } = await pool.query(
         `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','finalizado'))::int AS ocupados
          FROM agendamentos
@@ -111,7 +151,7 @@ export async function getDailySlots({ data }) {
     );
 
     const ocupacao = new Map(rows.map(r => [r.horario.slice(0, 5), r.ocupados]));
-    const slots = buildSlotsOfDay().map(h => {
+    const slots: TimeSlot[] = buildSlotsOfDay().map(h => {
         const used = ocupacao.get(h) || 0;
         return {
             horario: h,
@@ -124,11 +164,19 @@ export async function getDailySlots({ data }) {
     return { data, slots };
 }
 
-export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20, isAdmin = false }) {
-    // ✅ REMOVIDO: autoFinalizeAppointments() - sem lógica automática
+export async function list(filters: ListFilters) {
+    const {
+        status,
+        data_ini,
+        data_fim,
+        usuario_id,
+        page = 1,
+        page_size = 20,
+        isAdmin = false
+    } = filters;
 
-    const where = [];
-    const params = [];
+    const where: string[] = [];
+    const params: any[] = [];
     let i = 1;
 
     if (usuario_id) {
@@ -211,7 +259,7 @@ export async function list({ status, data_ini, data_fim, usuario_id, page = 1, p
     };
 }
 
-export async function getByIdWithClientInfo(id, user) {
+export async function getByIdWithClientInfo(id: string, user: AuthUser): Promise<any> {
     const isAdmin = user?.role === "admin";
 
     const query = isAdmin
@@ -240,13 +288,10 @@ export async function getByIdWithClientInfo(id, user) {
     const params = isAdmin ? [id] : [id, user.id];
     const { rows } = await pool.query(query, params);
 
-    if (!rows[0]) return null;
-
-    return rows[0];
+    return rows[0] || null;
 }
 
-// ✅ NOVA FUNÇÃO: Exclusão de agendamentos
-export async function deleteAgendamento(id, user) {
+export async function deleteAgendamento(id: string, user: AuthUser) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
@@ -282,7 +327,7 @@ export async function deleteAgendamento(id, user) {
     };
 }
 
-export async function create(payload) {
+export async function create(payload: CreateAgendamentoPayload) {
     const {
         usuario_id,
         modelo_veiculo,
@@ -353,7 +398,7 @@ export async function create(payload) {
     return rows[0];
 }
 
-export async function reschedule(id, user, { data, horario }) {
+export async function reschedule(id: string, user: AuthUser, { data, horario }: ReschedulePayload) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
@@ -391,11 +436,10 @@ export async function reschedule(id, user, { data, horario }) {
     return rows[0];
 }
 
-export async function updateStatus(id, user, newStatus) {
+export async function updateStatus(id: string, user: AuthUser, newStatus: string) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    // ✅ NOVA VALIDAÇÃO: Usar a função simplificada
     if (!canTransition(ag.status, newStatus, user.role)) {
         const transitions = user.role === "admin"
             ? "admins podem cancelar ou finalizar agendamentos"
@@ -413,7 +457,7 @@ export async function updateStatus(id, user, newStatus) {
     return rows[0];
 }
 
-export async function updateAgendamento(id, user, payload) {
+export async function updateAgendamento(id: string, user: AuthUser, payload: UpdateAgendamentoPayload) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 

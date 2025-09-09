@@ -1,8 +1,8 @@
-// scripts/checkRole.js - VERIFICAR E CORRIGIR ROLE
+// scripts/checkRole.ts - VERIFICAR E CORRIGIR ROLE
 import "dotenv/config";
-import { pool } from "../src/database/index.js";
+import { pool } from "../src/database/index";
 
-async function checkUserRole() {
+async function checkUserRole(): Promise<void> {
     try {
         const email = "admin@alphaclean.com";
         console.log("🔍 Verificando role do usuário:", email);
@@ -35,25 +35,25 @@ async function checkUserRole() {
         }
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
+        console.error("❌ Erro:", (error as Error).message);
     } finally {
         await pool.end();
         process.exit(0);
     }
 }
 
-async function makeUserAdmin() {
+async function makeUserAdmin(): Promise<void> {
     try {
         const email = "admin@alphaclean.com";
         console.log("🛠️ Transformando usuário em admin:", email);
 
         // Atualizar role para admin
         const { rows } = await pool.query(`
-            UPDATE usuarios 
-            SET role = 'admin'::user_role, updated_at = NOW() 
-            WHERE email = $1 
-            RETURNING id, nome, email, role, active
-        `, [email]);
+      UPDATE usuarios 
+      SET role = 'admin'::user_role, updated_at = NOW() 
+      WHERE email = $1 
+      RETURNING id, nome, email, role, active
+    `, [email]);
 
         if (rows.length === 0) {
             console.log("❌ Usuário não encontrado!");
@@ -74,8 +74,8 @@ async function makeUserAdmin() {
         console.log("3. Deve ir para /admin automaticamente");
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
-        if (error.message.includes('user_role')) {
+        console.error("❌ Erro:", (error as Error).message);
+        if ((error as Error).message.includes('user_role')) {
             console.log("💡 Possível problema: enum user_role não aceita 'admin'");
             console.log("Verifique se o enum no banco tem os valores corretos");
         }
@@ -85,15 +85,15 @@ async function makeUserAdmin() {
     }
 }
 
-async function listAllUsers() {
+async function listAllUsers(): Promise<void> {
     try {
         console.log("👥 Listando TODOS os usuários com roles:");
 
         const { rows } = await pool.query(`
-            SELECT id, nome, email, role, active, created_at 
-            FROM usuarios 
-            ORDER BY created_at DESC
-        `);
+      SELECT id, nome, email, role, active, created_at 
+      FROM usuarios 
+      ORDER BY created_at DESC
+    `);
 
         if (rows.length === 0) {
             console.log("❌ Nenhum usuário encontrado!");
@@ -112,26 +112,26 @@ async function listAllUsers() {
         console.log(`\n📊 Resumo: ${rows.length} usuários total, ${admins.length} admin(s)`);
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
+        console.error("❌ Erro:", (error as Error).message);
     } finally {
         await pool.end();
         process.exit(0);
     }
 }
 
-async function checkEnumValues() {
+async function checkEnumValues(): Promise<void> {
     try {
         console.log("🔍 Verificando valores do enum user_role...");
 
         const { rows } = await pool.query(`
-            SELECT enumlabel 
-            FROM pg_enum 
-            WHERE enumtypid = (
-                SELECT oid 
-                FROM pg_type 
-                WHERE typname = 'user_role'
-            )
-        `);
+      SELECT enumlabel 
+      FROM pg_enum 
+      WHERE enumtypid = (
+        SELECT oid 
+        FROM pg_type 
+        WHERE typname = 'user_role'
+      )
+    `);
 
         console.log("🎭 Valores permitidos no enum user_role:");
         rows.forEach(row => {
@@ -151,7 +151,7 @@ async function checkEnumValues() {
         }
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
+        console.error("❌ Erro:", (error as Error).message);
     } finally {
         await pool.end();
         process.exit(0);
@@ -170,9 +170,9 @@ if (command === "check") {
     checkEnumValues();
 } else {
     console.log("Usage:");
-    console.log("node scripts/checkRole.js check      # Verificar role do admin");
-    console.log("node scripts/checkRole.js make-admin # Transformar em admin");
-    console.log("node scripts/checkRole.js list       # Listar todos usuários");
-    console.log("node scripts/checkRole.js enum       # Verificar enum user_role");
+    console.log("ts-node scripts/checkRole.ts check      # Verificar role do admin");
+    console.log("ts-node scripts/checkRole.ts make-admin # Transformar em admin");
+    console.log("ts-node scripts/checkRole.ts list       # Listar todos usuários");
+    console.log("ts-node scripts/checkRole.ts enum       # Verificar enum user_role");
     process.exit(1);
 }

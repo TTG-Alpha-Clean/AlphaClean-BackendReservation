@@ -1,13 +1,27 @@
-// scripts/createAdmin.js - CRIAR USUÁRIO ADMIN
+// scripts/createAdmin.ts - CRIAR USUÁRIO ADMIN
 import "dotenv/config";
-import { pool } from "../src/database/index.js";
-import { hashPassword } from "../src/utils/password.js";
+import { pool } from "../src/database/index";
+import { hashPassword } from "../src/utils/password";
 
-async function createAdmin() {
+interface AdminData {
+    nome: string;
+    email: string;
+    senha: string;
+    role: string;
+}
+
+interface UserData {
+    nome: string;
+    email: string;
+    senha: string;
+    role: string;
+}
+
+async function createAdmin(): Promise<void> {
     try {
         console.log("🚀 Criando usuário admin...");
 
-        const adminData = {
+        const adminData: AdminData = {
             nome: "Administrador",
             email: "admin@alphaclean.com",
             senha: "admin123", // ⚠️ MUDAR ESTA SENHA!
@@ -32,10 +46,10 @@ async function createAdmin() {
 
         // Criar admin
         const { rows } = await pool.query(`
-            INSERT INTO usuarios (nome, email, senha, role, active)
-            VALUES ($1, $2, $3, $4::user_role, true)
-            RETURNING id, nome, email, role, created_at
-        `, [adminData.nome, adminData.email, hashedPassword, adminData.role]);
+      INSERT INTO usuarios (nome, email, senha, role, active)
+      VALUES ($1, $2, $3, $4::user_role, true)
+      RETURNING id, nome, email, role, created_at
+    `, [adminData.nome, adminData.email, hashedPassword, adminData.role]);
 
         const admin = rows[0];
 
@@ -47,7 +61,7 @@ async function createAdmin() {
         console.log("📅 Criado em:", admin.created_at);
 
     } catch (error) {
-        console.error("❌ Erro ao criar admin:", error.message);
+        console.error("❌ Erro ao criar admin:", (error as Error).message);
     } finally {
         await pool.end();
         console.log("🔌 Conexão fechada");
@@ -56,11 +70,11 @@ async function createAdmin() {
 }
 
 // Função para criar usuário comum também
-async function createUser() {
+async function createUser(): Promise<void> {
     try {
         console.log("👤 Criando usuário comum...");
 
-        const userData = {
+        const userData: UserData = {
             nome: "João Silva",
             email: "joao@teste.com",
             senha: "123456",
@@ -83,10 +97,10 @@ async function createUser() {
         const hashedPassword = await hashPassword(userData.senha);
 
         const { rows } = await pool.query(`
-            INSERT INTO usuarios (nome, email, senha, role, active)
-            VALUES ($1, $2, $3, $4::user_role, true)
-            RETURNING id, nome, email, role, created_at
-        `, [userData.nome, userData.email, hashedPassword, userData.role]);
+      INSERT INTO usuarios (nome, email, senha, role, active)
+      VALUES ($1, $2, $3, $4::user_role, true)
+      RETURNING id, nome, email, role, created_at
+    `, [userData.nome, userData.email, hashedPassword, userData.role]);
 
         const user = rows[0];
 
@@ -96,7 +110,7 @@ async function createUser() {
         console.log("👤 Role:", user.role);
 
     } catch (error) {
-        console.error("❌ Erro ao criar usuário:", error.message);
+        console.error("❌ Erro ao criar usuário:", (error as Error).message);
     } finally {
         await pool.end();
         process.exit(0);
@@ -111,7 +125,7 @@ if (command === "admin") {
     createUser();
 } else {
     console.log("Usage:");
-    console.log("node scripts/createAdmin.js admin  # Criar admin");
-    console.log("node scripts/createAdmin.js user   # Criar usuário comum");
+    console.log("ts-node scripts/createAdmin.ts admin  # Criar admin");
+    console.log("ts-node scripts/createAdmin.ts user   # Criar usuário comum");
     process.exit(1);
 }

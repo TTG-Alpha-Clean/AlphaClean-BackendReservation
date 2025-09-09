@@ -1,7 +1,7 @@
-// scripts/debugLogin.js - CORRIGIDO COM VARIÁVEIS DE AMBIENTE
+// scripts/debugLogin.ts - CORRIGIDO COM VARIÁVEIS DE AMBIENTE
 import "dotenv/config";
-import { pool } from "../src/database/index.js";
-import { verifyPassword } from "../src/utils/password.js";
+import { pool } from "../src/database/index";
+import { verifyPassword } from "../src/utils/password";
 
 // ✅ Mostrar configuração da conexão
 console.log("🔧 Configuração da conexão:");
@@ -9,7 +9,7 @@ console.log("- DATABASE_URL:", process.env.DATABASE_URL ? "✅ Definida" : "❌ 
 console.log("- DB_SSL:", process.env.DB_SSL);
 console.log("- NODE_ENV:", process.env.NODE_ENV);
 
-async function debugLogin() {
+async function debugLogin(): Promise<void> {
     try {
         const email = "admin@alphaclean.com";
         console.log("\n🔍 Verificando usuário:", email);
@@ -63,12 +63,12 @@ async function debugLogin() {
                     break;
                 }
             } catch (error) {
-                console.log("❌ Erro ao verificar senha:", error.message);
+                console.log("❌ Erro ao verificar senha:", (error as Error).message);
             }
         }
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
+        console.error("❌ Erro:", (error as Error).message);
         console.error("🔧 Verifique se as variáveis de ambiente estão corretas");
     } finally {
         await pool.end();
@@ -76,7 +76,7 @@ async function debugLogin() {
     }
 }
 
-async function listUsers() {
+async function listUsers(): Promise<void> {
     try {
         console.log("🔌 Testando conexão...");
 
@@ -87,10 +87,10 @@ async function listUsers() {
         console.log("\n👥 Listando todos os usuários:");
 
         const { rows } = await pool.query(`
-            SELECT id, nome, email, role, active, created_at 
-            FROM usuarios 
-            ORDER BY created_at DESC
-        `);
+      SELECT id, nome, email, role, active, created_at 
+      FROM usuarios 
+      ORDER BY created_at DESC
+    `);
 
         if (rows.length === 0) {
             console.log("❌ Nenhum usuário encontrado!");
@@ -106,8 +106,8 @@ async function listUsers() {
         });
 
     } catch (error) {
-        console.error("❌ Erro:", error.message);
-        if (error.code === 'ECONNREFUSED') {
+        console.error("❌ Erro:", (error as Error).message);
+        if ((error as any).code === 'ECONNREFUSED') {
             console.log("🔧 Erro de conexão! Verifique:");
             console.log("- Se o DATABASE_URL está correto");
             console.log("- Se as credenciais estão válidas");
@@ -127,7 +127,7 @@ if (command === "login") {
     listUsers();
 } else {
     console.log("Usage:");
-    console.log("node scripts/debugLogin.js login  # Debug login do admin");
-    console.log("node scripts/debugLogin.js users  # Listar usuários");
+    console.log("ts-node scripts/debugLogin.ts login  # Debug login do admin");
+    console.log("ts-node scripts/debugLogin.ts users  # Listar usuários");
     process.exit(1);
 }

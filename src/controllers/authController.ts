@@ -1,15 +1,23 @@
-import asyncHandler from "../utils/asyncHandler.js";
-import { validateRegister, validateLogin, validateRole } from "../utils/userValidators.js";
-import * as userSvc from "../services/userService.js";
-import { signJWT, verifyJWT } from "../utils/jwt.js";
+// src/controllers/authController.ts
+import { Request, Response, NextFunction } from 'express';
 
-export const register = asyncHandler(async (req, res) => {
+import { validateRegister, validateLogin, validateRole } from "../utils/userValidators";
+import * as userSvc from "../services/userService";
+import { signJWT, verifyJWT } from "../utils/jwt";
+
+// Helper para async handlers
+const asyncHandler = (fn: Function) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+};
+
+export const register = asyncHandler(async (req: Request, res: Response) => {
     const parsed = validateRegister(req.body);
-    // role pedido no body (pode ser undefined)
     const requestedRole = parsed.role;
 
-    // regra: permitir admin apenas se ainda não houver admin na base
-    let finalRole = "user";
+    // Regra: permitir admin apenas se ainda não houver admin na base
+    let finalRole: 'user' | 'admin' = "user";
     if (requestedRole === "admin") {
         const anyAdmin = await userSvc.hasAnyAdmin();
         if (!anyAdmin) {
@@ -17,7 +25,7 @@ export const register = asyncHandler(async (req, res) => {
         }
     }
 
-    // valida role final (apenas "user" | "admin")
+    // Valida role final
     validateRole(finalRole);
 
     const created = await userSvc.createUser({
@@ -31,18 +39,22 @@ export const register = asyncHandler(async (req, res) => {
     res.status(201).json(created);
 });
 
-export const login = asyncHandler(async (req, res) => {
+export const login = asyncHandler(async (req: Request, res: Response) => {
     const { email, senha } = validateLogin(req.body);
     const user = await userSvc.login({ email, senha });
+
     const token = signJWT(
         { sub: user.id, role: user.role },
-        { secret: process.env.JWT_SECRET || "dev", expiresInSec: Number(process.env.JWT_EXPIRES_IN || 3600) }
+        {
+            secret: process.env.JWT_SECRET || "dev",
+            expiresInSec: Number(process.env.JWT_EXPIRES_IN || 3600)
+        }
     );
 
     const maxAge = 1000 * Number(process.env.JWT_EXPIRES_IN || 3600);
 
-    // seta cookie httpOnly com o token
-    res.setCookie("access_token", token, {
+    // Seta cookie httpOnly com o token
+    res.cookie("access_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -50,17 +62,17 @@ export const login = asyncHandler(async (req, res) => {
         maxAge
     });
 
-    // seta cookies espelho para o middleware do Next.js conseguir ler
-    res.setCookie("has_session", "1", {
-        httpOnly: false, // permite JS ler
+    // Seta cookies espelho para o middleware do Next.js conseguir ler
+    res.cookie("has_session", "1", {
+        httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
         maxAge
     });
 
-    res.setCookie("role", user.role, {
-        httpOnly: false, // permite JS ler
+    res.cookie("role", user.role, {
+        httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
@@ -70,11 +82,12 @@ export const login = asyncHandler(async (req, res) => {
     res.json({ token, user });
 });
 
-// Nova rota para verificar se o usuário está logado
-export const me = asyncHandler(async (req, res) => {
+export const me = asyncHandler(async (req: Request, res: Response) => {
     const auth = req.headers.authorization || "";
     const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-    const cookieToken = typeof req.cookies?.access_token === "string" && req.cookies.access_token.trim() ? req.cookies.access_token.trim() : null;
+    const cookieToken = typeof (req as any).cookies?.access_token === "string" &&
+        (req as any).cookies.access_token.trim() ?
+        (req as any).cookies.access_token.trim() : null;
     const token = bearer || cookieToken;
 
     if (!token) {
@@ -103,10 +116,9 @@ export const me = asyncHandler(async (req, res) => {
     }
 });
 
-// Rota para logout
-export const logout = asyncHandler(async (req, res) => {
+export const logout = asyncHandler(async (req: Request, res: Response) => {
     // Remove os cookies
-    res.setCookie("access_token", "", {
+    res.cookie("access_token", "", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -114,7 +126,7 @@ export const logout = asyncHandler(async (req, res) => {
         maxAge: 0
     });
 
-    res.setCookie("has_session", "", {
+    res.cookie("has_session", "", {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -122,7 +134,7 @@ export const logout = asyncHandler(async (req, res) => {
         maxAge: 0
     });
 
-    res.setCookie("role", "", {
+    res.cookie("role", "", {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

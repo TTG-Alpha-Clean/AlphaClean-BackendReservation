@@ -1,8 +1,7 @@
-// src/routes/agendamentos.js - COM LOGS DE DEBUG
-
+// src/routes/agendamentoRoutes.ts
 import express from "express";
-import { requireUser, requireAdmin } from "../middlewares/auth.js";
-import * as controller from "../controllers/agendamentoController.js";
+import { requireUser, requireAdmin } from "../middlewares/auth";
+import * as controller from "../controllers/agendamentoController";
 
 const router = express.Router();
 

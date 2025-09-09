@@ -1,8 +1,8 @@
-// src/services/servicoService.js
-import { pool } from "../database/index.js";
-import ApiError from "../utils/apiError.js";
+// src/services/servicoService.ts
+import { pool } from "../database/index";
+import ApiError from "../utils/apiError";
 
-export async function listServicos({ ativo = true } = {}) {
+export async function listServicos({ ativo = true }: any = {}): Promise<any[]> {
     const query = ativo
         ? "SELECT * FROM servicos WHERE ativo = true ORDER BY nome ASC"
         : "SELECT * FROM servicos ORDER BY nome ASC";
@@ -11,12 +11,12 @@ export async function listServicos({ ativo = true } = {}) {
     return rows;
 }
 
-export async function getServicoById(id) {
+export async function getServicoById(id: string): Promise<any> {
     const { rows } = await pool.query("SELECT * FROM servicos WHERE id = $1", [id]);
     return rows[0] || null;
 }
 
-export async function createServico({ nome, valor }) {
+export async function createServico({ nome, valor }: any): Promise<any> {
     if (!nome || !valor) {
         throw new ApiError(400, "Nome e valor são obrigatórios");
     }
@@ -28,12 +28,12 @@ export async function createServico({ nome, valor }) {
     try {
         const { rows } = await pool.query(
             `INSERT INTO servicos (nome, valor) 
-             VALUES ($1, $2) 
-             RETURNING *`,
+       VALUES ($1, $2) 
+       RETURNING *`,
             [nome.trim(), Number(valor)]
         );
         return rows[0];
-    } catch (err) {
+    } catch (err: any) {
         if (err.code === "23505") { // unique constraint
             throw new ApiError(409, "Já existe um serviço com este nome");
         }
@@ -41,7 +41,7 @@ export async function createServico({ nome, valor }) {
     }
 }
 
-export async function updateServico(id, { nome, valor, ativo }) {
+export async function updateServico(id: string, { nome, valor, ativo }: any): Promise<any> {
     const servico = await getServicoById(id);
     if (!servico) {
         throw new ApiError(404, "Serviço não encontrado");
@@ -51,20 +51,20 @@ export async function updateServico(id, { nome, valor, ativo }) {
         throw new ApiError(400, "Valor deve ser maior que zero");
     }
 
-    const updates = [];
-    const params = [];
+    const updates: string[] = [];
+    const params: any[] = [];
     let paramIndex = 1;
 
     if (nome !== undefined) {
-        updates.push(`nome = $${paramIndex++}`);
+        updates.push(`nome = ${paramIndex++}`);
         params.push(nome.trim());
     }
     if (valor !== undefined) {
-        updates.push(`valor = $${paramIndex++}`);
+        updates.push(`valor = ${paramIndex++}`);
         params.push(Number(valor));
     }
     if (ativo !== undefined) {
-        updates.push(`ativo = $${paramIndex++}`);
+        updates.push(`ativo = ${paramIndex++}`);
         params.push(Boolean(ativo));
     }
 
@@ -77,11 +77,11 @@ export async function updateServico(id, { nome, valor, ativo }) {
 
     try {
         const { rows } = await pool.query(
-            `UPDATE servicos SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+            `UPDATE servicos SET ${updates.join(', ')} WHERE id = ${paramIndex} RETURNING *`,
             params
         );
         return rows[0];
-    } catch (err) {
+    } catch (err: any) {
         if (err.code === "23505") {
             throw new ApiError(409, "Já existe um serviço com este nome");
         }
@@ -89,7 +89,7 @@ export async function updateServico(id, { nome, valor, ativo }) {
     }
 }
 
-export async function deleteServico(id) {
+export async function deleteServico(id: string): Promise<any> {
     const servico = await getServicoById(id);
     if (!servico) {
         throw new ApiError(404, "Serviço não encontrado");
@@ -101,7 +101,7 @@ export async function deleteServico(id) {
         [id]
     );
 
-    if (rowCount > 0) {
+    if (rowCount && rowCount > 0) {
         // Em vez de deletar, desativa o serviço
         return await updateServico(id, { ativo: false });
     }
