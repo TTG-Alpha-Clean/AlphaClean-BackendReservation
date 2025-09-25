@@ -1,14 +1,46 @@
-// src/utils/validators.js - ATUALIZADO PARA SERVICO_ID
-import ApiError from "./apiError.js";
+// src/utils/validators.ts - VERSÃO TYPESCRIPT
+import ApiError from "./apiError";
 
-// formatos básicos; DB já tem checks, isso aqui é para erro amigável
 const DATE_RX = /^\d{4}-\d{2}-\d{2}$/;     // YYYY-MM-DD
 const TIME_RX = /^\d{2}:\d{2}$/;           // HH:mm
 const PLATE_RX_MERCOSUL = /^[A-Z]{3}\d[A-Z]\d{2}$/; // ABC1D23 (Mercosul)
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function assertCreatePayload(body) {
-    // ✅ Agora usa servico_id em vez de servico
+// Interface para payload de criação
+interface CreatePayload {
+    usuario_id: string;
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para payload de atualização
+interface UpdatePayload {
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para reagendamento
+interface ReschedulePayload {
+    data: string;
+    horario: string;
+}
+
+// Interface para mudança de status
+interface StatusPayload {
+    status: string;
+}
+
+export function assertCreatePayload(body: any): CreatePayload {
     const required = ["modelo_veiculo", "placa", "servico_id", "data", "horario"];
     for (const k of required) {
         if (!body[k]) throw new ApiError(400, `Campo obrigatório: ${k}`);
@@ -24,19 +56,18 @@ export function assertCreatePayload(body) {
     }
 
     return {
-        usuario_id: body.usuario_id, // será sobrescrito pelo controller
+        usuario_id: body.usuario_id,
         modelo_veiculo: String(body.modelo_veiculo),
         cor: body.cor ? String(body.cor) : null,
         placa: String(body.placa).toUpperCase(),
-        servico_id: String(body.servico_id), // ✅ UUID do serviço
+        servico_id: String(body.servico_id),
         data: body.data,
         horario: body.horario,
         observacoes: body.observacoes ? String(body.observacoes) : null,
     };
 }
 
-// ✅ NOVA: Validação para edição completa
-export function assertUpdatePayload(body) {
+export function assertUpdatePayload(body: any): UpdatePayload {
     const required = ["modelo_veiculo", "placa", "servico_id", "data", "horario"];
     for (const k of required) {
         if (!body[k]) throw new ApiError(400, `Campo obrigatório: ${k}`);
@@ -54,41 +85,38 @@ export function assertUpdatePayload(body) {
         modelo_veiculo: String(body.modelo_veiculo),
         cor: body.cor ? String(body.cor) : null,
         placa: String(body.placa).toUpperCase(),
-        servico_id: String(body.servico_id), // ✅ UUID do serviço
+        servico_id: String(body.servico_id),
         data: body.data,
         horario: body.horario,
         observacoes: body.observacoes ? String(body.observacoes) : null,
     };
 }
 
-export function assertReschedulePayload(body) {
+export function assertReschedulePayload(body: any): ReschedulePayload {
     if (!body?.data || !DATE_RX.test(body.data)) throw new ApiError(400, "data (YYYY-MM-DD) é obrigatória");
     if (!body?.horario || !TIME_RX.test(body.horario)) throw new ApiError(400, "horario (HH:mm) é obrigatório");
     return { data: body.data, horario: body.horario };
 }
 
-export function assertStatusPayload(body) {
-    const allowed = ["agendado", "em_andamento", "concluido", "cancelado", "reagendado"];
+// Apenas 3 status permitidos
+export function assertStatusPayload(body: any): StatusPayload {
+    const allowed = ["agendado", "finalizado", "cancelado"];
     if (!body?.status || !allowed.includes(body.status)) {
         throw new ApiError(400, `status inválido. Valores permitidos: ${allowed.join(", ")}`);
     }
     return { status: body.status };
 }
 
-// Adicione estas funções no final do arquivo validators.js
-
-export function isPastDateTime(data, horario) {
+export function isPastDateTime(data: string, horario: string): boolean {
     const agendamento = new Date(`${data}T${horario}:00`);
     const agora = new Date();
     return agendamento < agora;
 }
 
-export function sanitizePlate(placa) {
+export function sanitizePlate(placa: string): string {
     if (!placa) return "";
-    // Remove espaços e caracteres especiais, converte para maiúsculo
     const clean = String(placa).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-    // Aplica formato Mercosul se tiver 7 caracteres
     if (clean.length === 7) {
         return clean.slice(0, 3) + clean.slice(3, 4) + clean.slice(4, 5) + clean.slice(5, 7);
     }

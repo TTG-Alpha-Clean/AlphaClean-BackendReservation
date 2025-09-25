@@ -1,8 +1,15 @@
-// src/controllers/servicoController.js
-import asyncHandler from "../utils/asyncHandler.js";
-import * as servicoSvc from "../services/servicoService.js";
+// src/controllers/servicoController.ts
+import { Request, Response, NextFunction } from 'express';
+import * as servicoSvc from "../services/servicoService";
 
-export const listServicos = asyncHandler(async (req, res) => {
+// Helper para async handlers
+const asyncHandler = (fn: Function) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+};
+
+export const listServicos = asyncHandler(async (req: Request, res: Response) => {
     const { ativo } = req.query;
     const incluirInativos = ativo === "false" || ativo === "all";
 
@@ -13,7 +20,7 @@ export const listServicos = asyncHandler(async (req, res) => {
     res.json({ data: servicos });
 });
 
-export const getServico = asyncHandler(async (req, res) => {
+export const getServico = asyncHandler(async (req: Request, res: Response) => {
     const servico = await servicoSvc.getServicoById(req.params.id);
     if (!servico) {
         return res.status(404).json({ error: "Serviço não encontrado" });
@@ -21,7 +28,7 @@ export const getServico = asyncHandler(async (req, res) => {
     res.json(servico);
 });
 
-export const createServico = asyncHandler(async (req, res) => {
+export const createServico = asyncHandler(async (req: Request, res: Response) => {
     const { nome, valor } = req.body;
 
     if (!nome || valor === undefined) {
@@ -32,13 +39,13 @@ export const createServico = asyncHandler(async (req, res) => {
     res.status(201).json(servico);
 });
 
-export const updateServico = asyncHandler(async (req, res) => {
+export const updateServico = asyncHandler(async (req: Request, res: Response) => {
     const { nome, valor, ativo } = req.body;
     const servico = await servicoSvc.updateServico(req.params.id, { nome, valor, ativo });
     res.json(servico);
 });
 
-export const deleteServico = asyncHandler(async (req, res) => {
+export const deleteServico = asyncHandler(async (req: Request, res: Response) => {
     const result = await servicoSvc.deleteServico(req.params.id);
     res.json(result);
 });

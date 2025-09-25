@@ -1,8 +1,29 @@
-// src/middlewares/cookieParser.js
-export default function cookieParser(options = {}) {
+// src/middlewares/cookieParser.ts
+import { Request, Response, NextFunction } from 'express';
+
+interface CookieOptions {
+    maxAge?: number;
+    expires?: Date;
+    domain?: string;
+    path?: string;
+    sameSite?: 'lax' | 'strict' | 'none';
+    secure?: boolean;
+    httpOnly?: boolean;
+    decode?: (val: string) => string;
+}
+
+interface CookieResponse extends Response {
+    setCookie: (name: string, value: string, opts?: CookieOptions) => void;
+}
+
+interface CookieRequest extends Request {
+    cookies: Record<string, string>;
+}
+
+export default function cookieParser(options: CookieOptions = {}) {
     const decode = options.decode || decodeURIComponent;
 
-    return function (req, res, next) {
+    return function (req: CookieRequest, res: CookieResponse, next: NextFunction) {
         const header = req.headers.cookie;
         req.cookies = Object.create(null);
 
@@ -23,8 +44,8 @@ export default function cookieParser(options = {}) {
             }
         }
 
-        // helper opcional para setar cookie sem depender de libs
-        res.setCookie = (name, value, opts = {}) => {
+        // Helper opcional para setar cookie sem depender de libs
+        res.setCookie = (name: string, value: string, opts: CookieOptions = {}) => {
             const pieces = [`${name}=${encodeURIComponent(value)}`];
 
             if (opts.maxAge != null) pieces.push(`Max-Age=${Math.floor(+opts.maxAge / 1000)}`);
@@ -33,7 +54,9 @@ export default function cookieParser(options = {}) {
             pieces.push(`Path=${opts.path || "/"}`);
             if (opts.sameSite) {
                 const ss = String(opts.sameSite).toLowerCase();
-                if (["lax", "strict", "none"].includes(ss)) pieces.push(`SameSite=${ss.charAt(0).toUpperCase()}${ss.slice(1)}`);
+                if (["lax", "strict", "none"].includes(ss)) {
+                    pieces.push(`SameSite=${ss.charAt(0).toUpperCase()}${ss.slice(1)}`);
+                }
             }
             if (opts.secure) pieces.push("Secure");
             if (opts.httpOnly) pieces.push("HttpOnly");

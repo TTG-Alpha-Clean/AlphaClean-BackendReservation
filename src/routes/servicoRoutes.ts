@@ -1,7 +1,7 @@
-// src/routes/servicoRoutes.js
+// src/routes/servicoRoutes.ts
 import { Router } from "express";
-import * as servicoController from "../controllers/servicoController.js";
-import { requireUser, requireAdmin } from "../middlewares/auth.js";
+import * as servicoController from "../controllers/servicoController";
+import { requireUser, requireAdmin } from "../middlewares/auth";
 
 const router = Router();
 

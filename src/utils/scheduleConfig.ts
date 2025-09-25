@@ -1,3 +1,4 @@
+// src/utils/scheduleConfig.ts
 // Configuração do agendamento (ajuste livremente)
 export const SCHEDULE = {
     TZ: "America/Bahia",
@@ -10,7 +11,7 @@ export const SCHEDULE = {
 };
 
 // Gera a grade do dia com base em OPEN/CLOSE e SLOT_MINUTES, excluindo horário de almoço
-export function buildSlotsOfDay() {
+export function buildSlotsOfDay(): string[] {
     const [oh, om] = SCHEDULE.OPEN.split(":").map(Number);
     const [ch, cm] = SCHEDULE.CLOSE.split(":").map(Number);
     const [lh_start, lm_start] = SCHEDULE.LUNCH_START.split(":").map(Number);
@@ -21,7 +22,7 @@ export function buildSlotsOfDay() {
     const lunchStart = lh_start * 60 + lm_start;
     const lunchEnd = lh_end * 60 + lm_end;
 
-    const slots = [];
+    const slots: string[] = [];
     for (let m = open; m + SCHEDULE.SLOT_MINUTES <= close; m += SCHEDULE.SLOT_MINUTES) {
         const h = Math.floor(m / 60);
         const mm = m % 60;

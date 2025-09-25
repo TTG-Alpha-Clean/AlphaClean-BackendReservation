@@ -1,9 +1,9 @@
-// src/services/agendamentoService.js - VERSÃO CORRIGIDA COMPLETA
+// src/services/agendamentoService.ts - VERSÃO TYPESCRIPT
+import { pool } from "../database/index";
+import ApiError from "../utils/apiError";
+import { AuthenticatedRequest, Agendamento, TimeSlot, DailySlotsResponse } from "../types/interfaces";
 
-import { pool } from "../database/index.js";
-import ApiError from "../utils/apiError.js";
-
-// Configurações de horários (substitua por suas configurações reais)
+// Configurações de horários
 const SCHEDULE = {
     OPEN: "08:00",
     CLOSE: "18:00",
@@ -12,9 +12,55 @@ const SCHEDULE = {
     TZ: "America/Sao_Paulo"
 };
 
+// Interface para filtros de listagem
+interface ListFilters {
+    status?: string;
+    data_ini?: string;
+    data_fim?: string;
+    usuario_id?: string | null;
+    page?: number;
+    page_size?: number;
+    isAdmin?: boolean;
+}
+
+// Interface para criação de agendamento
+interface CreateAgendamentoPayload {
+    usuario_id: string;
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para atualização de agendamento
+interface UpdateAgendamentoPayload {
+    modelo_veiculo: string;
+    cor?: string | null;
+    placa: string;
+    servico_id: string;
+    data: string;
+    horario: string;
+    observacoes?: string | null;
+}
+
+// Interface para reagendamento
+interface ReschedulePayload {
+    data: string;
+    horario: string;
+}
+
+// Interface para usuário autenticado (simplificada)
+interface AuthUser {
+    id: string;
+    role: 'user' | 'admin';
+}
+
 // Função auxiliar para gerar slots do dia
-function buildSlotsOfDay() {
-    const slots = [];
+function buildSlotsOfDay(): string[] {
+    const slots: string[] = [];
     const [openHour, openMin] = SCHEDULE.OPEN.split(':').map(Number);
     const [closeHour, closeMin] = SCHEDULE.CLOSE.split(':').map(Number);
 
@@ -32,70 +78,71 @@ function buildSlotsOfDay() {
     return slots;
 }
 
-// Função que estava faltando
-function parseStatusFilter(status) {
+function parseStatusFilter(status?: string): string[] | null {
     if (!status) return null;
     const arr = Array.isArray(status) ? status : String(status).split(",").map(s => s.trim());
     return arr.filter(Boolean);
 }
 
 // Funções auxiliares
-export function isPastDateTime(data, horario) {
+export function isPastDateTime(data: string, horario: string): boolean {
     const agendamento = new Date(`${data}T${horario}:00`);
     const agora = new Date();
     return agendamento < agora;
 }
 
-export function sanitizePlate(placa) {
+export function sanitizePlate(placa: string): string {
     if (!placa) return "";
     return String(placa).toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-function canTransition(currentStatus, newStatus) {
-    const transitions = {
-        'agendado': ['em_andamento', 'cancelado'],
-        'em_andamento': ['concluido', 'cancelado'],
-        'concluido': [],
-        'cancelado': [],
-        'reagendado': []
+// Lógica de transições simplificada
+function canTransition(currentStatus: string, newStatus: string, userRole: string): boolean {
+    // Para clientes - podem cancelar agendamentos
+    if (userRole !== "admin") {
+        return currentStatus === "agendado" && newStatus === "cancelado";
+    }
+
+    // Para admins - controle total
+    const transitions: Record<string, string[]> = {
+        'agendado': ['cancelado', 'finalizado'],
+        'cancelado': [], // Status final
+        'finalizado': [] // Status final
     };
+
     return transitions[currentStatus]?.includes(newStatus) || false;
 }
 
-function isTerminalStatus(status) {
-    return ['concluido', 'cancelado'].includes(status);
-}
-
 // Regras auxiliares
-async function countAtSlot({ data, horario }) {
+async function countAtSlot({ data, horario }: { data: string; horario: string }): Promise<number> {
     const q = `
         SELECT COUNT(*)::int AS total
         FROM agendamentos
         WHERE data = $1
           AND horario = $2::time
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
     `;
     const { rows } = await pool.query(q, [data, horario]);
     return rows[0]?.total || 0;
 }
 
-async function findById(id) {
+async function findById(id: string): Promise<any> {
     const { rows } = await pool.query(`SELECT * FROM agendamentos WHERE id = $1`, [id]);
     return rows[0] || null;
 }
 
-function assertOwnershipOrAdmin(ag, user) {
+function assertOwnershipOrAdmin(ag: any, user: AuthUser): void {
     if (!ag) throw new ApiError(404, "Agendamento não encontrado");
     if (user.role !== "admin" && ag.usuario_id !== user.id) {
         throw new ApiError(403, "Você não tem permissão para acessar este agendamento");
     }
 }
 
-// API pública
-export async function getDailySlots({ data }) {
-    // CORRIGIDO: incluir servico_id na busca
+// ===== API PÚBLICA =====
+
+export async function getDailySlots({ data }: { data: string }): Promise<DailySlotsResponse> {
     const { rows } = await pool.query(
-        `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','em_andamento'))::int AS ocupados
+        `SELECT horario::text, COUNT(*) FILTER (WHERE status IN ('agendado','finalizado'))::int AS ocupados
          FROM agendamentos
          WHERE data = $1 AND servico_id IS NOT NULL
          GROUP BY horario
@@ -103,11 +150,8 @@ export async function getDailySlots({ data }) {
         [data]
     );
 
-    // DEBUG: Adicione este log
-    console.log("🔍 Slots ocupados para", data, ":", rows);
-
     const ocupacao = new Map(rows.map(r => [r.horario.slice(0, 5), r.ocupados]));
-    const slots = buildSlotsOfDay().map(h => {
+    const slots: TimeSlot[] = buildSlotsOfDay().map(h => {
         const used = ocupacao.get(h) || 0;
         return {
             horario: h,
@@ -119,9 +163,20 @@ export async function getDailySlots({ data }) {
 
     return { data, slots };
 }
-export async function list({ status, data_ini, data_fim, usuario_id, page = 1, page_size = 20, isAdmin = false }) {
-    const where = [];
-    const params = [];
+
+export async function list(filters: ListFilters) {
+    const {
+        status,
+        data_ini,
+        data_fim,
+        usuario_id,
+        page = 1,
+        page_size = 20,
+        isAdmin = false
+    } = filters;
+
+    const where: string[] = [];
+    const params: any[] = [];
     let i = 1;
 
     if (usuario_id) {
@@ -177,44 +232,35 @@ export async function list({ status, data_ini, data_fim, usuario_id, page = 1, p
     params.push(page_size, offset);
 
     const countQuery = `
-        SELECT COUNT(*)::int AS count
+        SELECT COUNT(*)::int AS total
         FROM agendamentos a
         ${whereSQL}
     `;
+    const countParams = params.slice(0, -2); // Remove LIMIT e OFFSET
 
-    try {
-        const [dataRes, countRes] = await Promise.all([
-            pool.query(baseQuery, params),
-            pool.query(countQuery, params.slice(0, -2))
-        ]);
+    const [dataResult, countResult] = await Promise.all([
+        pool.query(baseQuery, params),
+        pool.query(countQuery, countParams)
+    ]);
 
-        const total = countRes.rows[0]?.count || 0;
+    const totalItems = countResult.rows[0]?.total || 0;
+    const totalPages = Math.ceil(totalItems / page_size);
 
-        console.log("🔍 Dados retornados da query:", dataRes.rows[0]);
-
-        return {
-            data: dataRes.rows,
+    return {
+        data: dataResult.rows,
+        pagination: {
             page,
             page_size,
-            total,
-            total_pages: Math.ceil(total / page_size),
-            has_next: page < Math.ceil(total / page_size),
+            total_items: totalItems,
+            total_pages: totalPages,
+            has_next: page < totalPages,
             has_prev: page > 1
-        };
-    } catch (error) {
-        console.error("Erro na query de agendamentos:", error);
-        throw new ApiError(500, "Erro ao buscar agendamentos", error);
-    }
+        }
+    };
 }
 
-export async function getById(id, user) {
-    const ag = await findById(id);
-    assertOwnershipOrAdmin(ag, user);
-    return ag;
-}
-
-export async function getByIdWithClientInfo(id, user) {
-    const isAdmin = user.role === "admin";
+export async function getByIdWithClientInfo(id: string, user: AuthUser): Promise<any> {
+    const isAdmin = user?.role === "admin";
 
     const query = isAdmin
         ? `
@@ -242,18 +288,52 @@ export async function getByIdWithClientInfo(id, user) {
     const params = isAdmin ? [id] : [id, user.id];
     const { rows } = await pool.query(query, params);
 
-    if (!rows[0]) return null;
-
-    return rows[0];
+    return rows[0] || null;
 }
 
-export async function create(payload) {
+export async function deleteAgendamento(id: string, user: AuthUser) {
+    const ag = await findById(id);
+    assertOwnershipOrAdmin(ag, user);
+
+    // Verificar se o agendamento pode ser excluído
+    const canDelete = user.role === "admin"
+        ? ['cancelado', 'finalizado'].includes(ag.status)  // Admin pode excluir cancelados e finalizados
+        : ag.status === 'cancelado';                       // Cliente só pode excluir cancelados
+
+    if (!canDelete) {
+        const allowedStatuses = user.role === "admin"
+            ? "cancelados ou finalizados"
+            : "cancelados";
+        throw new ApiError(400, `Só é possível excluir agendamentos ${allowedStatuses}`);
+    }
+
+    // Excluir o agendamento do banco de dados
+    const deleteQuery = `
+        DELETE FROM agendamentos 
+        WHERE id = $1 
+        RETURNING id, status, modelo_veiculo, data, horario
+    `;
+
+    const { rows } = await pool.query(deleteQuery, [id]);
+
+    if (!rows[0]) {
+        throw new ApiError(404, "Agendamento não encontrado");
+    }
+
+    return {
+        deleted: true,
+        agendamento: rows[0],
+        message: "Agendamento excluído com sucesso"
+    };
+}
+
+export async function create(payload: CreateAgendamentoPayload) {
     const {
         usuario_id,
         modelo_veiculo,
         cor,
         placa,
-        servico_id, // CORRIGIDO: usar servico_id
+        servico_id,
         data,
         horario,
         observacoes = null
@@ -286,7 +366,7 @@ export async function create(payload) {
     const dupQ = `
         SELECT 1 FROM agendamentos
         WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
         LIMIT 1
     `;
     const { rowCount: dup } = await pool.query(dupQ, [usuario_id, data, horario]);
@@ -295,56 +375,60 @@ export async function create(payload) {
     const plateCheckQ = `
         SELECT 1 FROM agendamentos
         WHERE placa = $1 AND data = $2
-          AND status IN ('agendado','em_andamento')
+          AND status IN ('agendado','finalizado')
         LIMIT 1
     `;
     const { rowCount: plateExists } = await pool.query(plateCheckQ, [plate, data]);
-    if (plateExists) throw new ApiError(409, "Esta placa já possui um agendamento ativo neste dia");
+    if (plateExists) throw new ApiError(409, "Esta placa já possui agendamento neste dia");
 
-    // CORRIGIDO: usar servico_id na query
-    const insert = `
-        INSERT INTO agendamentos (usuario_id, modelo_veiculo, cor, placa, servico_id, data, horario, observacoes, status)
+    const ins = `
+        INSERT INTO agendamentos (
+            usuario_id, modelo_veiculo, cor, placa,
+            servico_id, data, horario, observacoes, status
+        )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'agendado')
         RETURNING *
     `;
 
-    const { rows } = await pool.query(insert, [
-        usuario_id, modelo_veiculo, cor, plate, servico_id, data, horario, observacoes
+    const { rows } = await pool.query(ins, [
+        usuario_id, modelo_veiculo, cor, plate,
+        servico_id, data, horario, observacoes
     ]);
 
-    // Retornar com dados do serviço
-    return {
-        ...rows[0],
-        servico_nome: servicoRows[0].nome,
-        servico_valor: servicoRows[0].valor,
-    };
+    return rows[0];
 }
 
-export async function reschedule(id, user, { data, horario }) {
+export async function reschedule(id: string, user: AuthUser, { data, horario }: ReschedulePayload) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    if (isTerminalStatus(ag.status)) {
-        throw new ApiError(400, "Agendamentos finalizados ou cancelados não podem ser reagendados");
-    }
     if (ag.status !== "agendado") {
-        throw new ApiError(400, "Só é possível reagendar quando o status é 'agendado'");
+        throw new ApiError(400, "Só é possível reagendar agendamentos com status 'agendado'");
     }
+
     if (isPastDateTime(data, horario)) {
         throw new ApiError(400, "Não é possível reagendar para o passado");
     }
 
     const validSlot = buildSlotsOfDay().includes(horario);
-    if (!validSlot) throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
+    if (!validSlot) throw new ApiError(400, "Horário fora do expediente");
 
-    const used = await countAtSlot({ data, horario });
-    if (used >= SCHEDULE.MAX_CONCURRENT) {
-        throw new ApiError(409, "Horário esgotado");
+    // Verificar disponibilidade (excluindo o próprio agendamento)
+    const conflictQ = `
+        SELECT COUNT(*)::int AS total FROM agendamentos
+        WHERE data = $1 AND horario = $2::time AND id != $3
+          AND status IN ('agendado','finalizado')
+    `;
+    const { rows: conflictRows } = await pool.query(conflictQ, [data, horario, id]);
+    const conflicts = conflictRows[0]?.total || 0;
+
+    if (conflicts >= SCHEDULE.MAX_CONCURRENT) {
+        throw new ApiError(409, "Horário não disponível");
     }
 
     const upd = `
         UPDATE agendamentos
-        SET data = $1, horario = $2::time, updated_at = now()
+        SET data = $1, horario = $2, updated_at = now()
         WHERE id = $3
         RETURNING *
     `;
@@ -352,12 +436,15 @@ export async function reschedule(id, user, { data, horario }) {
     return rows[0];
 }
 
-export async function updateStatus(id, user, newStatus) {
+export async function updateStatus(id: string, user: AuthUser, newStatus: string) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
-    if (!canTransition(ag.status, newStatus)) {
-        throw new ApiError(400, `Transição de '${ag.status}' para '${newStatus}' não permitida`);
+    if (!canTransition(ag.status, newStatus, user.role)) {
+        const transitions = user.role === "admin"
+            ? "admins podem cancelar ou finalizar agendamentos"
+            : "clientes só podem cancelar agendamentos próprios";
+        throw new ApiError(400, `Transição de '${ag.status}' para '${newStatus}' não permitida. ${transitions}.`);
     }
 
     const upd = `
@@ -370,7 +457,7 @@ export async function updateStatus(id, user, newStatus) {
     return rows[0];
 }
 
-export async function updateAgendamento(id, user, payload) {
+export async function updateAgendamento(id: string, user: AuthUser, payload: UpdateAgendamentoPayload) {
     const ag = await findById(id);
     assertOwnershipOrAdmin(ag, user);
 
@@ -382,7 +469,7 @@ export async function updateAgendamento(id, user, payload) {
         modelo_veiculo,
         cor,
         placa,
-        servico_id, // CORRIGIDO: usar servico_id
+        servico_id,
         data,
         horario,
         observacoes
@@ -403,62 +490,31 @@ export async function updateAgendamento(id, user, payload) {
         throw new ApiError(400, "Horário fora do expediente ou inválido para o slot configurado");
     }
 
-    // Verificar se o serviço existe
-    const { rows: servicoRows } = await pool.query(
-        'SELECT id FROM servicos WHERE id = $1 AND ativo = true',
-        [servico_id]
-    );
+    // Verificar disponibilidade (excluindo o próprio agendamento)
+    const conflictQ = `
+        SELECT COUNT(*)::int AS total FROM agendamentos
+        WHERE data = $1 AND horario = $2::time AND id != $3
+          AND status IN ('agendado','finalizado')
+    `;
+    const { rows: conflictRows } = await pool.query(conflictQ, [data, horario, id]);
+    const conflicts = conflictRows[0]?.total || 0;
 
-    if (!servicoRows[0]) {
-        throw new ApiError(400, "Serviço não encontrado ou inativo");
+    if (conflicts >= SCHEDULE.MAX_CONCURRENT) {
+        throw new ApiError(409, "Horário não disponível");
     }
 
-    const changedDateTime = ag.data !== data || ag.horario !== horario;
-    if (changedDateTime) {
-        const used = await countAtSlot({ data, horario });
-        if (used >= SCHEDULE.MAX_CONCURRENT) {
-            throw new ApiError(409, "Horário esgotado");
-        }
-
-        const dupQ = `
-            SELECT 1 FROM agendamentos
-            WHERE usuario_id = $1 AND data = $2 AND horario = $3::time
-              AND status IN ('agendado','em_andamento')
-              AND id != $4
-            LIMIT 1
-        `;
-        const { rowCount: dup } = await pool.query(dupQ, [ag.usuario_id, data, horario, id]);
-        if (dup) {
-            throw new ApiError(409, "Você já possui um agendamento neste horário");
-        }
-    }
-
-    // CORRIGIDO: usar servico_id na query
-    const updateQuery = `
+    const upd = `
         UPDATE agendamentos
-        SET 
-            modelo_veiculo = $1,
-            cor = $2,
-            placa = $3,
-            servico_id = $4,
-            data = $5,
-            horario = $6::time,
-            observacoes = $7,
-            updated_at = now()
+        SET modelo_veiculo = $1, cor = $2, placa = $3, servico_id = $4,
+            data = $5, horario = $6, observacoes = $7, updated_at = now()
         WHERE id = $8
         RETURNING *
     `;
 
-    const { rows } = await pool.query(updateQuery, [
-        modelo_veiculo,
-        cor || null,
-        plate,
-        servico_id, // CORRIGIDO
-        data,
-        horario,
-        observacoes || null,
-        id
+    const { rows } = await pool.query(upd, [
+        modelo_veiculo, cor, plate, servico_id,
+        data, horario, observacoes, id
     ]);
 
-    return await getByIdWithClientInfo(rows[0].id, user);
+    return rows[0];
 }
