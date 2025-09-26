@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import whatsappService from '../services/whatsappService';
+import whatsappClient from '../services/whatsappClient';
 
 const router = Router();
 
@@ -8,9 +8,9 @@ const router = Router();
  * @desc Verificar status da conexão WhatsApp
  * @access Private (Admin)
  */
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   try {
-    const status = whatsappService.getConnectionStatus();
+    const status = await whatsappClient.getConnectionStatus();
     res.json({
       success: true,
       data: status
@@ -31,7 +31,7 @@ router.get('/status', (req, res) => {
  */
 router.post('/initialize', async (req, res) => {
   try {
-    await whatsappService.initialize();
+    const success = await whatsappClient.connect();
     res.json({
       success: true,
       message: 'WhatsApp inicializando... Aguarde o QR code no console do servidor.'
