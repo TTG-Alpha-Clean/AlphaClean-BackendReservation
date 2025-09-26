@@ -19,5 +19,10 @@
     "app.ts": {
       "maxDuration": 10
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "teste": true
+    }
   }
 }
