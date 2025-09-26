@@ -51,44 +51,18 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         }
     );
 
-    const maxAge = 1000 * Number(process.env.JWT_EXPIRES_IN || 3600);
-
-    // Seta cookie httpOnly com o token
-    res.cookie("access_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge
+    // Retorna o token como Bearer token no response
+    res.json({
+        token,
+        user,
+        tokenType: "Bearer",
+        expiresIn: Number(process.env.JWT_EXPIRES_IN || 3600)
     });
-
-    // Seta cookies espelho para o middleware do Next.js conseguir ler
-    res.cookie("has_session", "1", {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge
-    });
-
-    res.cookie("role", user.role, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge
-    });
-
-    res.json({ token, user });
 });
 
 export const me = asyncHandler(async (req: Request, res: Response) => {
     const auth = req.headers.authorization || "";
-    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-    const cookieToken = typeof (req as any).cookies?.access_token === "string" &&
-        (req as any).cookies.access_token.trim() ?
-        (req as any).cookies.access_token.trim() : null;
-    const token = bearer || cookieToken;
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
     if (!token) {
         return res.status(401).json({ error: "Não autenticado" });
@@ -117,30 +91,7 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-    // Remove os cookies
-    res.cookie("access_token", "", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 0
-    });
-
-    res.cookie("has_session", "", {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 0
-    });
-
-    res.cookie("role", "", {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 0
-    });
-
+    // Com Bearer tokens, o logout é feito no frontend removendo o token
+    // Aqui só confirmamos o logout
     res.json({ message: "Logout realizado com sucesso" });
 });

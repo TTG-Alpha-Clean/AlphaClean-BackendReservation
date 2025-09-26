@@ -2,6 +2,7 @@
 import { pool } from "../database/index";
 import ApiError from "../utils/apiError";
 import { hashPassword, verifyPassword } from "../utils/password";
+import bcrypt from 'bcryptjs';
 
 export async function findByEmail(email: string): Promise<any> {
     const { rows } = await pool.query(`select * from usuarios where email = $1 limit 1`, [email]);
@@ -62,7 +63,7 @@ export async function createUser({ nome, email, senha, role = "user", telefones 
         if (Array.isArray(telefones) && telefones.length) {
             const values = telefones.flatMap((t: any) => [user.id, t.ddd, t.numero, t.is_whatsapp]);
             const placeholders = telefones.map((_: any, idx: number) =>
-                `(${idx * 4 + 1}, ${idx * 4 + 2}, ${idx * 4 + 3}, ${idx * 4 + 4})`).join(",");
+                `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`).join(",");
 
             await pool.query(
                 `insert into telefones (usuario_id, ddd, numero, is_whatsapp) values ${placeholders}`,
@@ -111,7 +112,16 @@ export async function login({ email, senha }: any): Promise<any> {
     const user = await findByEmail(email);
     if (!user || !user.active) throw new ApiError(401, "Credenciais inválidas");
 
-    const ok = await verifyPassword(senha, user.senha);
+    // Suporte para ambos os formatos de hash: scrypt e bcrypt
+    let ok = false;
+    if (user.senha.startsWith('$2b$')) {
+        // Hash bcrypt (usado pelo admin)
+        ok = await bcrypt.compare(senha, user.senha);
+    } else if (user.senha.startsWith('scrypt$')) {
+        // Hash scrypt (usado por usuarios normais)
+        ok = await verifyPassword(senha, user.senha);
+    }
+
     if (!ok) throw new ApiError(401, "Credenciais inválidas");
 
     // retorna dados públicos + sub para token

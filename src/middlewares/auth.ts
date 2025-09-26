@@ -5,11 +5,7 @@ import { verifyJWT } from "../utils/jwt";
 
 export function requireUser(req: AuthenticatedRequest & Request, res: Response, next: NextFunction) {
     const auth = req.headers['authorization'] || "";
-    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-    const cookieToken = typeof req.cookies?.access_token === "string" &&
-        req.cookies.access_token.trim() ?
-        req.cookies.access_token.trim() : null;
-    const token = bearer || cookieToken;
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
     if (!token) {
         return res.status(401).json({ error: "Não autenticado" });
