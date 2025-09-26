@@ -178,14 +178,22 @@ class WhatsAppService {
     return formattedNumber;
   }
 
-  async sendServiceCompletedNotification(clientName: string, clientPhone: string, serviceName: string): Promise<boolean> {
+  async sendServiceCompletedNotification(clientName: string, clientPhone: string, serviceName: string, vehicleModel?: string, licensePlate?: string): Promise<boolean> {
+    let vehicleInfo = '';
+    if (vehicleModel || licensePlate) {
+      vehicleInfo = `\n🚗 *Veículo:* ${vehicleModel || 'Não informado'}`;
+      if (licensePlate) {
+        vehicleInfo += `\n🔖 *Placa:* ${licensePlate.toUpperCase()}`;
+      }
+    }
+
     const message = `🎉 *Alpha Clean - Serviço Concluído!*
 
 Olá, ${clientName}! 👋
 
 Temos o prazer de informar que seu serviço foi finalizado com sucesso! ✨
 
-📋 *Serviço realizado:* ${serviceName}
+📋 *Serviço realizado:* ${serviceName}${vehicleInfo}
 ✅ *Status:* Concluído
 📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
 

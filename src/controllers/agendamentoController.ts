@@ -115,7 +115,9 @@ export const completeService = authenticatedHandler(async (req: AuthenticatedReq
                 const enviado = await whatsappService.sendServiceCompletedNotification(
                     agendamentoCompleto.usuario_nome || 'Cliente',
                     agendamentoCompleto.usuario_telefone,
-                    agendamentoCompleto.servico_nome || 'Serviço'
+                    agendamentoCompleto.servico_nome || 'Serviço',
+                    agendamentoCompleto.modelo_veiculo,
+                    agendamentoCompleto.placa
                 );
 
                 console.log("📱 WhatsApp enviado:", enviado);

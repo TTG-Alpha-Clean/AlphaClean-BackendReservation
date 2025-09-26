@@ -1,6 +1,3 @@
-2025/09/26-15:41:23.540 75e0 Reusing MANIFEST C:\Users\Administrador\Documents\Projects\TTG-AlphaClean\AlphaClean-BackendReservation\src\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
-2025/09/26-15:41:23.540 75e0 Recovering log #3
-2025/09/26-15:41:23.540 75e0 Reusing old log C:\Users\Administrador\Documents\Projects\TTG-AlphaClean\AlphaClean-BackendReservation\src\.wwebjs_auth\session\Default\Local Storage\leveldb/000003.log 
-2025/09/26-15:42:24.219 762c Level-0 table #5: started
-2025/09/26-15:42:24.221 762c Level-0 table #5: 21495 bytes OK
-2025/09/26-15:42:24.222 762c Delete type=0 #3
+2025/09/26-15:46:59.273 68c4 Reusing MANIFEST C:\Users\Administrador\Documents\Projects\TTG-AlphaClean\AlphaClean-BackendReservation\src\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2025/09/26-15:46:59.273 68c4 Recovering log #4
+2025/09/26-15:46:59.274 68c4 Reusing old log C:\Users\Administrador\Documents\Projects\TTG-AlphaClean\AlphaClean-BackendReservation\src\.wwebjs_auth\session\Default\Local Storage\leveldb/000004.log 
