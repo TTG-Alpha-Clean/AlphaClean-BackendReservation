@@ -57,6 +57,10 @@ router.patch("/:id/status", (req, res, next) => {
     console.log("🔍 ROTA PATCH /:id/status chamada para ID:", req.params.id);
     controller.updateStatus(req, res, next);
 });
+router.patch("/:id/complete", (req, res, next) => {
+    console.log("🔍 ROTA PATCH /:id/complete chamada para ID:", req.params.id);
+    controller.completeService(req, res, next);
+});
 router.delete("/:id/cancel", (req, res, next) => {
     console.log("🔍 ROTA DELETE /:id/cancel chamada para ID:", req.params.id);
     console.log("🔍 ROTA - Esta deveria chamar controller.cancel");

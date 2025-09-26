@@ -16,6 +16,7 @@ exports.hasAnyAdmin = hasAnyAdmin;
 const index_1 = require("../database/index");
 const apiError_1 = __importDefault(require("../utils/apiError"));
 const password_1 = require("../utils/password");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 async function findByEmail(email) {
     const { rows } = await index_1.pool.query(`select * from usuarios where email = $1 limit 1`, [email]);
     return rows[0] || null;
@@ -60,7 +61,7 @@ async function createUser({ nome, email, senha, role = "user", telefones = [] })
         const user = rows[0];
         if (Array.isArray(telefones) && telefones.length) {
             const values = telefones.flatMap((t) => [user.id, t.ddd, t.numero, t.is_whatsapp]);
-            const placeholders = telefones.map((_, idx) => `(${idx * 4 + 1}, ${idx * 4 + 2}, ${idx * 4 + 3}, ${idx * 4 + 4})`).join(",");
+            const placeholders = telefones.map((_, idx) => `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`).join(",");
             await index_1.pool.query(`insert into telefones (usuario_id, ddd, numero, is_whatsapp) values ${placeholders}`, values);
         }
         return user;
@@ -95,7 +96,16 @@ async function login({ email, senha }) {
     const user = await findByEmail(email);
     if (!user || !user.active)
         throw new apiError_1.default(401, "Credenciais inválidas");
-    const ok = await (0, password_1.verifyPassword)(senha, user.senha);
+    // Suporte para ambos os formatos de hash: scrypt e bcrypt
+    let ok = false;
+    if (user.senha.startsWith('$2b$')) {
+        // Hash bcrypt (usado pelo admin)
+        ok = await bcryptjs_1.default.compare(senha, user.senha);
+    }
+    else if (user.senha.startsWith('scrypt$')) {
+        // Hash scrypt (usado por usuarios normais)
+        ok = await (0, password_1.verifyPassword)(senha, user.senha);
+    }
     if (!ok)
         throw new apiError_1.default(401, "Credenciais inválidas");
     // retorna dados públicos + sub para token

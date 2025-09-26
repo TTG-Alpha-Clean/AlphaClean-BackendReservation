@@ -54,7 +54,8 @@ exports.list = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
 exports.getById = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     const u = await userSvc.getById(req.params.id);
     if (!u) {
-        return res.status(404).json({ error: "Usuário não encontrado" });
+        res.status(404).json({ error: "Usuário não encontrado" });
+        return;
     }
     res.json(u);
 });

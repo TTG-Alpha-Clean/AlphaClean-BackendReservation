@@ -5,13 +5,10 @@ exports.requireAdmin = requireAdmin;
 const jwt_1 = require("../utils/jwt");
 function requireUser(req, res, next) {
     const auth = req.headers['authorization'] || "";
-    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-    const cookieToken = typeof req.cookies?.access_token === "string" &&
-        req.cookies.access_token.trim() ?
-        req.cookies.access_token.trim() : null;
-    const token = bearer || cookieToken;
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
     if (!token) {
-        return res.status(401).json({ error: "Não autenticado" });
+        res.status(401).json({ error: "Não autenticado" });
+        return;
     }
     try {
         const payload = (0, jwt_1.verifyJWT)(token, { secret: process.env.JWT_SECRET || "dev" });
@@ -28,7 +25,8 @@ function requireUser(req, res, next) {
 }
 function requireAdmin(req, res, next) {
     if (req.user?.role !== "admin") {
-        return res.status(403).json({ error: "Apenas admin" });
+        res.status(403).json({ error: "Apenas admin" });
+        return;
     }
     next();
 }

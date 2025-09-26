@@ -33,14 +33,15 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAgendamento = exports.cancel = exports.updateStatus = exports.reschedule = exports.updateAgendamento = exports.create = exports.getById = exports.list = exports.getDailySlots = void 0;
+exports.deleteAgendamento = exports.completeService = exports.cancel = exports.updateStatus = exports.reschedule = exports.updateAgendamento = exports.create = exports.getById = exports.list = exports.getDailySlots = void 0;
 const asyncHandler_1 = require("../utils/asyncHandler");
 const agendamentoService = __importStar(require("../services/agendamentoService"));
 const validators_1 = require("../utils/validators");
 exports.getDailySlots = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const { data } = req.query;
     if (!data || typeof data !== 'string') {
-        return res.status(400).json({ error: "data (YYYY-MM-DD) é obrigatória" });
+        res.status(400).json({ error: "data (YYYY-MM-DD) é obrigatória" });
+        return;
     }
     const result = await agendamentoService.getDailySlots({ data });
     res.json(result);
@@ -63,13 +64,15 @@ exports.list = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
 exports.getById = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     const ag = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user);
     if (!ag) {
-        return res.status(404).json({ error: "Agendamento não encontrado" });
+        res.status(404).json({ error: "Agendamento não encontrado" });
+        return;
     }
     res.json(ag);
 });
 exports.create = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     if (!req.user?.id) {
-        return res.status(401).json({ error: "Não autenticado" });
+        res.status(401).json({ error: "Não autenticado" });
+        return;
     }
     const payload = (0, validators_1.assertCreatePayload)(req.body);
     payload.usuario_id = req.user.id; // Ensure usuario_id is always a string
@@ -96,6 +99,58 @@ exports.cancel = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     console.log("🔍 CANCEL - User:", { id: req.user.id, role: req.user.role });
     const updated = await agendamentoService.updateStatus(req.params.id, req.user, "cancelado");
     console.log("🔍 CANCEL - Resultado:", updated);
+    res.json(updated);
+});
+exports.completeService = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
+    console.log("🔍 COMPLETE - Controller chamado para ID:", req.params.id);
+    console.log("🔍 COMPLETE - User:", { id: req.user.id, role: req.user.role });
+    // Verificar se é admin
+    if (req.user.role !== 'admin') {
+        res.status(403).json({ error: "Apenas administradores podem finalizar serviços" });
+        return;
+    }
+    const { status = 'finalizado', notes, sendWhatsApp = false } = req.body;
+    // Atualizar status do agendamento
+    const updated = await agendamentoService.updateStatus(req.params.id, req.user, status);
+    // Se deve enviar WhatsApp, buscar dados completos e enviar notificação
+    if (sendWhatsApp && status === 'finalizado') {
+        try {
+            // Buscar dados completos do agendamento com informações do cliente
+            const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user);
+            if (agendamentoCompleto?.usuario_telefone) {
+                const whatsappService = require('../services/whatsappService').default;
+                const enviado = await whatsappService.sendServiceCompletedNotification(agendamentoCompleto.usuario_nome || 'Cliente', agendamentoCompleto.usuario_telefone, agendamentoCompleto.servico_nome || 'Serviço');
+                console.log("📱 WhatsApp enviado:", enviado);
+                res.json({
+                    ...updated,
+                    whatsappSent: enviado,
+                    message: enviado
+                        ? "Serviço finalizado e notificação WhatsApp enviada com sucesso!"
+                        : "Serviço finalizado, mas houve falha no envio do WhatsApp"
+                });
+                return;
+            }
+            else {
+                console.log("⚠️ Cliente não possui telefone cadastrado");
+                res.json({
+                    ...updated,
+                    whatsappSent: false,
+                    message: "Serviço finalizado. Cliente não possui telefone cadastrado para WhatsApp."
+                });
+                return;
+            }
+        }
+        catch (whatsappError) {
+            console.error("❌ Erro ao enviar WhatsApp:", whatsappError);
+            res.json({
+                ...updated,
+                whatsappSent: false,
+                message: "Serviço finalizado, mas houve erro no envio do WhatsApp"
+            });
+            return;
+        }
+    }
+    console.log("🔍 COMPLETE - Resultado:", updated);
     res.json(updated);
 });
 exports.deleteAgendamento = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {

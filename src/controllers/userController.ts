@@ -23,10 +23,11 @@ export const list = authenticatedHandler(async (req: AuthenticatedRequest, res: 
     res.json(result);
 });
 
-export const getById = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const getById = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const u = await userSvc.getById(req.params.id);
     if (!u) {
-        return res.status(404).json({ error: "Usuário não encontrado" });
+        res.status(404).json({ error: "Usuário não encontrado" });
+        return;
     }
     res.json(u);
 });

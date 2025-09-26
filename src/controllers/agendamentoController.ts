@@ -10,17 +10,18 @@ import {
     assertUpdatePayload
 } from '../utils/validators';
 
-export const getDailySlots = asyncHandler(async (req: Request, res: Response) => {
+export const getDailySlots = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { data } = req.query;
     if (!data || typeof data !== 'string') {
-        return res.status(400).json({ error: "data (YYYY-MM-DD) é obrigatória" });
+        res.status(400).json({ error: "data (YYYY-MM-DD) é obrigatória" });
+        return;
     }
 
     const result = await agendamentoService.getDailySlots({ data });
     res.json(result);
 });
 
-export const list = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const list = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { status, data_ini, data_fim, usuario_id, page = "1", page_size = "20" } = req.query;
     const isAdmin = req.user?.role === "admin";
 
@@ -38,17 +39,19 @@ export const list = authenticatedHandler(async (req: AuthenticatedRequest, res: 
     res.json(result);
 });
 
-export const getById = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const getById = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const ag = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
     if (!ag) {
-        return res.status(404).json({ error: "Agendamento não encontrado" });
+        res.status(404).json({ error: "Agendamento não encontrado" });
+        return;
     }
     res.json(ag);
 });
 
-export const create = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const create = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     if (!req.user?.id) {
-        return res.status(401).json({ error: "Não autenticado" });
+        res.status(401).json({ error: "Não autenticado" });
+        return;
     }
 
     const payload = assertCreatePayload(req.body);
@@ -57,25 +60,25 @@ export const create = authenticatedHandler(async (req: AuthenticatedRequest, res
     res.status(201).json(created);
 });
 
-export const updateAgendamento = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const updateAgendamento = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const payload = assertUpdatePayload(req.body);
     const updated = await agendamentoService.updateAgendamento(req.params.id, req.user!, payload);
     res.json(updated);
 });
 
-export const reschedule = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const reschedule = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const data = assertReschedulePayload(req.body);
     const updated = await agendamentoService.reschedule(req.params.id, req.user!, data);
     res.json(updated);
 });
 
-export const updateStatus = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const updateStatus = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const { status } = assertStatusPayload(req.body);
     const updated = await agendamentoService.updateStatus(req.params.id, req.user!, status);
     res.json(updated);
 });
 
-export const cancel = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const cancel = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     console.log("🔍 CANCEL - Controller chamado para ID:", req.params.id);
     console.log("🔍 CANCEL - User:", { id: req.user!.id, role: req.user!.role });
 
@@ -85,7 +88,71 @@ export const cancel = authenticatedHandler(async (req: AuthenticatedRequest, res
     res.json(updated);
 });
 
-export const deleteAgendamento = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+export const completeService = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    console.log("🔍 COMPLETE - Controller chamado para ID:", req.params.id);
+    console.log("🔍 COMPLETE - User:", { id: req.user!.id, role: req.user!.role });
+
+    // Verificar se é admin
+    if (req.user!.role !== 'admin') {
+        res.status(403).json({ error: "Apenas administradores podem finalizar serviços" });
+        return;
+    }
+
+    const { status = 'finalizado', notes, sendWhatsApp = false } = req.body;
+
+    // Atualizar status do agendamento
+    const updated = await agendamentoService.updateStatus(req.params.id, req.user!, status);
+
+    // Se deve enviar WhatsApp, buscar dados completos e enviar notificação
+    if (sendWhatsApp && status === 'finalizado') {
+        try {
+            // Buscar dados completos do agendamento com informações do cliente
+            const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
+
+            if (agendamentoCompleto?.usuario_telefone) {
+                const whatsappService = require('../services/whatsappService').default;
+
+                const enviado = await whatsappService.sendServiceCompletedNotification(
+                    agendamentoCompleto.usuario_nome || 'Cliente',
+                    agendamentoCompleto.usuario_telefone,
+                    agendamentoCompleto.servico_nome || 'Serviço'
+                );
+
+                console.log("📱 WhatsApp enviado:", enviado);
+
+                res.json({
+                    ...updated,
+                    whatsappSent: enviado,
+                    message: enviado
+                        ? "Serviço finalizado e notificação WhatsApp enviada com sucesso!"
+                        : "Serviço finalizado, mas houve falha no envio do WhatsApp"
+                });
+                return;
+            } else {
+                console.log("⚠️ Cliente não possui telefone cadastrado");
+                res.json({
+                    ...updated,
+                    whatsappSent: false,
+                    message: "Serviço finalizado. Cliente não possui telefone cadastrado para WhatsApp."
+                });
+                return;
+            }
+        } catch (whatsappError) {
+            console.error("❌ Erro ao enviar WhatsApp:", whatsappError);
+            res.json({
+                ...updated,
+                whatsappSent: false,
+                message: "Serviço finalizado, mas houve erro no envio do WhatsApp"
+            });
+            return;
+        }
+    }
+
+    console.log("🔍 COMPLETE - Resultado:", updated);
+    res.json(updated);
+});
+
+export const deleteAgendamento = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     console.log("🔍 DELETE - Controller chamado para ID:", req.params.id);
     console.log("🔍 DELETE - User:", { id: req.user!.id, role: req.user!.role });
 

@@ -3,12 +3,13 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types/interfaces';
 import { verifyJWT } from "../utils/jwt";
 
-export function requireUser(req: AuthenticatedRequest & Request, res: Response, next: NextFunction) {
+export function requireUser(req: AuthenticatedRequest & Request, res: Response, next: NextFunction): void {
     const auth = req.headers['authorization'] || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
     if (!token) {
-        return res.status(401).json({ error: "Não autenticado" });
+        res.status(401).json({ error: "Não autenticado" });
+        return;
     }
 
     try {
@@ -26,9 +27,10 @@ export function requireUser(req: AuthenticatedRequest & Request, res: Response, 
     }
 }
 
-export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
     if (req.user?.role !== "admin") {
-        return res.status(403).json({ error: "Apenas admin" });
+        res.status(403).json({ error: "Apenas admin" });
+        return;
     }
     next();
 }

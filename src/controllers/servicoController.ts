@@ -20,19 +20,21 @@ export const listServicos = asyncHandler(async (req: Request, res: Response) => 
     res.json({ data: servicos });
 });
 
-export const getServico = asyncHandler(async (req: Request, res: Response) => {
+export const getServico = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const servico = await servicoSvc.getServicoById(req.params.id);
     if (!servico) {
-        return res.status(404).json({ error: "Serviço não encontrado" });
+        res.status(404).json({ error: "Serviço não encontrado" });
+        return;
     }
     res.json(servico);
 });
 
-export const createServico = asyncHandler(async (req: Request, res: Response) => {
+export const createServico = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const { nome, valor } = req.body;
 
     if (!nome || valor === undefined) {
-        return res.status(400).json({ error: "Nome e valor são obrigatórios" });
+        res.status(400).json({ error: "Nome e valor são obrigatórios" });
+        return;
     }
 
     const servico = await servicoSvc.createServico({ nome, valor });

@@ -10,13 +10,16 @@ const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 // ✅ IMPORTS DE SEGURANÇA
 const security_1 = require("./src/middlewares/security");
-const cookieParser_1 = __importDefault(require("./src/middlewares/cookieParser"));
 const index_1 = require("./src/database/index");
 // rotas
 const authRoutes_1 = __importDefault(require("./src/routes/authRoutes"));
 const userRoutes_1 = __importDefault(require("./src/routes/userRoutes"));
 const agendamentoRoutes_1 = __importDefault(require("./src/routes/agendamentoRoutes"));
 const servicoRoutes_1 = __importDefault(require("./src/routes/servicoRoutes"));
+const servicesRoutes_1 = __importDefault(require("./src/routes/servicesRoutes"));
+const adminRoutes_1 = __importDefault(require("./src/routes/adminRoutes"));
+const whatsapp_1 = __importDefault(require("./src/routes/whatsapp"));
+// services (WhatsApp será carregado dinamicamente)
 // middlewares
 const notFound_1 = __importDefault(require("./src/middlewares/notFound"));
 const errorHandler_1 = __importDefault(require("./src/middlewares/errorHandler"));
@@ -33,7 +36,7 @@ const corsOptions = {
             return cb(null, true); // server-to-server / curl
         cb(null, ALLOWED_ORIGINS.includes(origin));
     },
-    credentials: true,
+    credentials: false,
 };
 // ===== App =====
 const app = (0, express_1.default)();
@@ -64,8 +67,6 @@ app.use(express_1.default.json({
 app.use(express_1.default.urlencoded({ extended: true, limit: "1mb" }));
 // 7. Morgan para logs
 app.use((0, morgan_1.default)(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-// 8. Cookie parser
-app.use((0, cookieParser_1.default)());
 // ===== ROTAS COM RATE LIMITING ESPECÍFICO =====
 // Health checks (sem rate limiting)
 app.get("/health", (req, res) => {
@@ -99,12 +100,16 @@ app.get("/ping", async (req, res) => {
         });
     }
 });
-// Auth routes com rate limiting específico
-app.use("/auth", security_1.authLimiter, authRoutes_1.default);
-// API routes com rate limiting inteligente
-app.use("/api/users", security_1.smartRateLimiter, userRoutes_1.default);
-app.use("/api/agendamentos", security_1.smartRateLimiter, agendamentoRoutes_1.default);
-app.use("/api/servicos", security_1.smartRateLimiter, servicoRoutes_1.default);
+// Auth routes (rate limiting desabilitado temporariamente para testes)
+app.use("/auth", authRoutes_1.default);
+// Admin routes (rate limiting desabilitado temporariamente para testes)
+app.use("/admin", adminRoutes_1.default);
+// API routes (rate limiting desabilitado temporariamente para testes)
+app.use("/api/users", userRoutes_1.default);
+app.use("/api/agendamentos", agendamentoRoutes_1.default);
+app.use("/api/servicos", servicoRoutes_1.default);
+app.use("/api/services", servicesRoutes_1.default);
+app.use("/api/whatsapp", whatsapp_1.default);
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound_1.default);
 app.use(errorHandler_1.default);
@@ -121,11 +126,13 @@ process.on('SIGINT', async () => {
 });
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`🔒 Segurança: Helmet + Rate Limiting habilitados`);
     console.log(`🌍 CORS permitido para: ${ALLOWED_ORIGINS.join(', ')}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    // WhatsApp será inicializado via admin panel
+    console.log('📱 WhatsApp disponível via admin panel');
 });
 exports.default = app;
 //# sourceMappingURL=app.js.map

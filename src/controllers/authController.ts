@@ -60,12 +60,13 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 
-export const me = asyncHandler(async (req: Request, res: Response) => {
+export const me = asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = req.headers.authorization || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
     if (!token) {
-        return res.status(401).json({ error: "Não autenticado" });
+        res.status(401).json({ error: "Não autenticado" });
+        return;
     }
 
     try {
@@ -73,7 +74,8 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
         const user = await userSvc.getById(payload.sub);
 
         if (!user || !user.active) {
-            return res.status(401).json({ error: "Usuário inativo" });
+            res.status(401).json({ error: "Usuário inativo" });
+            return;
         }
 
         res.json({

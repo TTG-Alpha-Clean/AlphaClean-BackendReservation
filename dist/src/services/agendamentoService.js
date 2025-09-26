@@ -140,15 +140,17 @@ async function list(filters) {
     // Query diferente para admin - inclui dados do cliente
     const baseQuery = isAdmin
         ? `
-        SELECT 
+        SELECT
             a.*,
             u.nome as usuario_nome,
             u.email as usuario_email,
+            CONCAT(t.ddd, t.numero) as usuario_telefone,
             s.nome as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
@@ -193,15 +195,17 @@ async function getByIdWithClientInfo(id, user) {
     const isAdmin = user?.role === "admin";
     const query = isAdmin
         ? `
-        SELECT 
+        SELECT
             a.*,
             u.nome as usuario_nome,
             u.email as usuario_email,
+            CONCAT(t.ddd, t.numero) as usuario_telefone,
             s.nome as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         WHERE a.id = $1
         `
         : `

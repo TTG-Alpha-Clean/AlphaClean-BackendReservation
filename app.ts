@@ -23,6 +23,9 @@ import agendamentosRoutes from "./src/routes/agendamentoRoutes";
 import servicosRoutes from "./src/routes/servicoRoutes";
 import servicesRoutes from "./src/routes/servicesRoutes";
 import adminRoutes from "./src/routes/adminRoutes";
+import whatsappRoutes from "./src/routes/whatsapp";
+
+// services (WhatsApp será carregado dinamicamente)
 
 // middlewares
 import notFound from "./src/middlewares/notFound";
@@ -129,6 +132,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/agendamentos", agendamentosRoutes);
 app.use("/api/servicos", servicosRoutes);
 app.use("/api/services", servicesRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound);
@@ -150,11 +154,14 @@ process.on('SIGINT', async () => {
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`🔒 Segurança: Helmet + Rate Limiting habilitados`);
     console.log(`🌍 CORS permitido para: ${ALLOWED_ORIGINS.join(', ')}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+
+    // WhatsApp será inicializado via admin panel
+    console.log('📱 WhatsApp disponível via admin panel');
 });
 
 export default app;
