@@ -4,17 +4,30 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 
-// ✅ IMPORTS DE SEGURANÇA
-import {
-    helmetConfig,
-    generalLimiter,
-    authLimiter,
-    securityLogger,
-    customSecurityHeaders,
-    smartRateLimiter
-} from "./src/middlewares/security";
+console.log("🚀 Starting Alpha Clean Backend...");
+console.log("📊 NODE_ENV:", process.env.NODE_ENV);
+console.log("🌍 VERCEL:", process.env.VERCEL);
+console.log("🔗 DATABASE_URL:", process.env.DATABASE_URL ? "✅ Set" : "❌ Missing");
 
-import { pool } from "./src/database/index";
+// ✅ IMPORTS DE SEGURANÇA
+let securityMiddlewares;
+let pool;
+
+try {
+    console.log("📦 Loading security middlewares...");
+    securityMiddlewares = require("./src/middlewares/security");
+    console.log("✅ Security middlewares loaded");
+} catch (error) {
+    console.error("❌ Failed to load security middlewares:", error);
+}
+
+try {
+    console.log("🗄️ Loading database connection...");
+    pool = require("./src/database/index").pool;
+    console.log("✅ Database connection loaded");
+} catch (error) {
+    console.error("❌ Failed to load database connection:", error);
+}
 
 // rotas
 import authRoutes from "./src/routes/authRoutes";
@@ -51,21 +64,53 @@ const corsOptions = {
 const app = express();
 app.set("trust proxy", 1); // Para funcionar atrás de proxy/load balancer
 
+// ===== HEALTH CHECK (antes de qualquer middleware) =====
+app.get("/", (req, res) => {
+    try {
+        res.status(200).json({
+            status: "ok",
+            message: "Alpha Clean Backend is running",
+            timestamp: new Date().toISOString(),
+            env: process.env.NODE_ENV || "development"
+        });
+    } catch (error) {
+        console.error("Health check error:", error);
+        res.status(500).json({
+            status: "error",
+            message: "Server error in health check"
+        });
+    }
+});
+
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "healthy",
+        timestamp: new Date().toISOString()
+    });
+});
+
 // ✅ MIDDLEWARES DE SEGURANÇA (ORDEM IMPORTANTE!)
-// 1. Headers de segurança personalizados (primeiro)
-app.use(customSecurityHeaders);
+if (securityMiddlewares) {
+    console.log("🔒 Applying security middlewares...");
+    // 1. Headers de segurança personalizados (primeiro)
+    app.use(securityMiddlewares.customSecurityHeaders);
 
-// 2. Helmet para headers de segurança padrão
-app.use(helmetConfig);
+    // 2. Helmet para headers de segurança padrão
+    app.use(securityMiddlewares.helmetConfig);
 
-// 3. CORS
-app.use(cors(corsOptions));
+    // 3. CORS
+    app.use(cors(corsOptions));
 
-// 4. Rate limiting geral
-app.use(generalLimiter);
+    // 4. Rate limiting geral
+    app.use(securityMiddlewares.generalLimiter);
 
-// 5. Logging de segurança
-app.use(securityLogger);
+    // 5. Logging de segurança
+    app.use(securityMiddlewares.securityLogger);
+    console.log("✅ Security middlewares applied");
+} else {
+    console.log("⚠️ Skipping security middlewares (failed to load)");
+    app.use(cors(corsOptions));
+}
 
 // 6. Parser do body
 app.use(express.json({

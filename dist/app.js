@@ -8,9 +8,29 @@ require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
+console.log("🚀 Starting Alpha Clean Backend...");
+console.log("📊 NODE_ENV:", process.env.NODE_ENV);
+console.log("🌍 VERCEL:", process.env.VERCEL);
+console.log("🔗 DATABASE_URL:", process.env.DATABASE_URL ? "✅ Set" : "❌ Missing");
 // ✅ IMPORTS DE SEGURANÇA
-const security_1 = require("./src/middlewares/security");
-const index_1 = require("./src/database/index");
+let securityMiddlewares;
+let pool;
+try {
+    console.log("📦 Loading security middlewares...");
+    securityMiddlewares = require("./src/middlewares/security");
+    console.log("✅ Security middlewares loaded");
+}
+catch (error) {
+    console.error("❌ Failed to load security middlewares:", error);
+}
+try {
+    console.log("🗄️ Loading database connection...");
+    pool = require("./src/database/index").pool;
+    console.log("✅ Database connection loaded");
+}
+catch (error) {
+    console.error("❌ Failed to load database connection:", error);
+}
 // rotas
 const authRoutes_1 = __importDefault(require("./src/routes/authRoutes"));
 const userRoutes_1 = __importDefault(require("./src/routes/userRoutes"));
@@ -41,17 +61,49 @@ const corsOptions = {
 // ===== App =====
 const app = (0, express_1.default)();
 app.set("trust proxy", 1); // Para funcionar atrás de proxy/load balancer
+// ===== HEALTH CHECK (antes de qualquer middleware) =====
+app.get("/", (req, res) => {
+    try {
+        res.status(200).json({
+            status: "ok",
+            message: "Alpha Clean Backend is running",
+            timestamp: new Date().toISOString(),
+            env: process.env.NODE_ENV || "development"
+        });
+    }
+    catch (error) {
+        console.error("Health check error:", error);
+        res.status(500).json({
+            status: "error",
+            message: "Server error in health check"
+        });
+    }
+});
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "healthy",
+        timestamp: new Date().toISOString()
+    });
+});
 // ✅ MIDDLEWARES DE SEGURANÇA (ORDEM IMPORTANTE!)
-// 1. Headers de segurança personalizados (primeiro)
-app.use(security_1.customSecurityHeaders);
-// 2. Helmet para headers de segurança padrão
-app.use(security_1.helmetConfig);
-// 3. CORS
-app.use((0, cors_1.default)(corsOptions));
-// 4. Rate limiting geral
-app.use(security_1.generalLimiter);
-// 5. Logging de segurança
-app.use(security_1.securityLogger);
+if (securityMiddlewares) {
+    console.log("🔒 Applying security middlewares...");
+    // 1. Headers de segurança personalizados (primeiro)
+    app.use(securityMiddlewares.customSecurityHeaders);
+    // 2. Helmet para headers de segurança padrão
+    app.use(securityMiddlewares.helmetConfig);
+    // 3. CORS
+    app.use((0, cors_1.default)(corsOptions));
+    // 4. Rate limiting geral
+    app.use(securityMiddlewares.generalLimiter);
+    // 5. Logging de segurança
+    app.use(securityMiddlewares.securityLogger);
+    console.log("✅ Security middlewares applied");
+}
+else {
+    console.log("⚠️ Skipping security middlewares (failed to load)");
+    app.use((0, cors_1.default)(corsOptions));
+}
 // 6. Parser do body
 app.use(express_1.default.json({
     limit: "1mb",
@@ -84,7 +136,7 @@ app.get("/health", (req, res) => {
 });
 app.get("/ping", async (req, res) => {
     try {
-        const result = await index_1.pool.query("SELECT NOW()");
+        const result = await pool.query("SELECT NOW()");
         res.json({
             status: "ok",
             database: "connected",
@@ -116,12 +168,12 @@ app.use(errorHandler_1.default);
 // ===== GRACEFUL SHUTDOWN =====
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
-    await index_1.pool.end();
+    await pool.end();
     process.exit(0);
 });
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
-    await index_1.pool.end();
+    await pool.end();
     process.exit(0);
 });
 // ===== START SERVER (only in non-serverless environments) =====
