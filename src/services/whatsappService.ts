@@ -68,7 +68,7 @@ class WhatsAppService {
         console.log('📱 QR Code para conectar WhatsApp:');
         qrcode.generate(qr, { small: true });
         console.log('👆 Escaneie o QR code acima com seu WhatsApp');
-        console.log('⏰ QR Code válido por aproximadamente 30 segundos');
+        console.log('⏰ QR Code válido por aproximadamente 2 minutos');
       });
 
       // Evento de conexão pronta
