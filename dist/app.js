@@ -25,12 +25,16 @@ catch (error) {
 }
 try {
     console.log("🗄️ Loading database connection...");
+    console.log("🔍 DATABASE_URL available:", !!process.env.DATABASE_URL);
+    console.log("🔍 DATABASE_URL starts with:", process.env.DATABASE_URL?.substring(0, 20) + "...");
     const dbModule = require("./src/database/index");
     pool = dbModule.pool;
     console.log("✅ Database connection loaded");
+    console.log("🔍 Pool object:", !!pool);
 }
 catch (error) {
     console.error("❌ Failed to load database connection:", error);
+    console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
 }
 // rotas
 const authRoutes_1 = __importDefault(require("./src/routes/authRoutes"));
@@ -137,10 +141,15 @@ app.get("/health", (req, res) => {
 });
 app.get("/ping", async (req, res) => {
     try {
+        console.log("🔍 Ping endpoint called");
+        console.log("🔍 Pool available:", !!pool);
+        console.log("🔍 DATABASE_URL set:", !!process.env.DATABASE_URL);
         if (!pool) {
             throw new Error("Database pool not initialized");
         }
+        console.log("🔍 Attempting database query...");
         const result = await pool.query("SELECT NOW()");
+        console.log("✅ Database query successful");
         res.json({
             status: "ok",
             database: "connected",
@@ -148,11 +157,16 @@ app.get("/ping", async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Erro ao conectar no banco:", error);
+        console.error("❌ Erro ao conectar no banco:", error);
+        console.error("❌ Error stack:", error instanceof Error ? error.stack : String(error));
         res.status(500).json({
             status: "error",
             database: "disconnected",
-            error: error instanceof Error ? error.message : "Database connection failed"
+            error: error instanceof Error ? error.message : "Database connection failed",
+            details: {
+                poolAvailable: !!pool,
+                databaseUrlSet: !!process.env.DATABASE_URL
+            }
         });
     }
 });
