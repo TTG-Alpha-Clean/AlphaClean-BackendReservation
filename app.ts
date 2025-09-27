@@ -95,6 +95,22 @@ app.get("/health", (req, res) => {
     });
 });
 
+app.get("/env-check", (req, res) => {
+    res.json({
+        status: "ok",
+        environment: {
+            NODE_ENV: process.env.NODE_ENV,
+            VERCEL: process.env.VERCEL,
+            DATABASE_URL_SET: !!process.env.DATABASE_URL,
+            DATABASE_URL_PREFIX: process.env.DATABASE_URL?.substring(0, 20) + "...",
+            CORS_ORIGINS_SET: !!process.env.CORS_ORIGINS,
+            JWT_SECRET_SET: !!process.env.JWT_SECRET,
+            WHATSAPP_SERVICE_URL_SET: !!process.env.WHATSAPP_SERVICE_URL
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+
 // ✅ MIDDLEWARES DE SEGURANÇA (ORDEM IMPORTANTE!)
 if (securityMiddlewares) {
     console.log("🔒 Applying security middlewares...");
