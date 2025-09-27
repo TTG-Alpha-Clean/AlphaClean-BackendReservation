@@ -110,9 +110,9 @@ export const completeService = authenticatedHandler(async (req: AuthenticatedReq
             const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
 
             if (agendamentoCompleto?.usuario_telefone) {
-                const whatsappService = require('../services/whatsappService').default;
+                const whatsappClient = require('../services/whatsappClient').default;
 
-                const enviado = await whatsappService.sendServiceCompletedNotification(
+                const enviado = await whatsappClient.sendServiceCompletedNotification(
                     agendamentoCompleto.usuario_nome || 'Cliente',
                     agendamentoCompleto.usuario_telefone,
                     agendamentoCompleto.servico_nome || 'Serviço',
