@@ -46,7 +46,11 @@ import notFound from "./src/middlewares/notFound";
 import errorHandler from "./src/middlewares/errorHandler";
 
 // ===== CORS (com credenciais) =====
-const DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"];
+const DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://alpha-clean-pearl.vercel.app"
+];
 const ENV_ORIGINS = (process.env.CORS_ORIGINS || "")
     .split(",")
     .map((s) => s.trim())

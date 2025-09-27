@@ -43,7 +43,11 @@ const whatsapp_1 = __importDefault(require("./src/routes/whatsapp"));
 const notFound_1 = __importDefault(require("./src/middlewares/notFound"));
 const errorHandler_1 = __importDefault(require("./src/middlewares/errorHandler"));
 // ===== CORS (com credenciais) =====
-const DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"];
+const DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://alpha-clean-pearl.vercel.app"
+];
 const ENV_ORIGINS = (process.env.CORS_ORIGINS || "")
     .split(",")
     .map((s) => s.trim())
