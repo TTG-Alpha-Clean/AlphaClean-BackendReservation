@@ -94,7 +94,13 @@ class WhatsAppClient {
     }
     async getConnectionStatus() {
         try {
-            const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/status`);
+            const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/status`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: AbortSignal.timeout(10000) // 10s timeout
+            });
             if (!response.ok) {
                 return {
                     connected: false,
@@ -102,7 +108,10 @@ class WhatsAppClient {
                 };
             }
             const result = await response.json();
-            return result;
+            return {
+                connected: result.connected || false,
+                message: result.message || 'Status desconhecido'
+            };
         }
         catch (error) {
             console.error('❌ Erro ao verificar status do WhatsApp Service:', error);
@@ -115,9 +124,18 @@ class WhatsAppClient {
     async connect() {
         try {
             const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/connect`, {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: AbortSignal.timeout(15000) // 15s timeout
             });
-            return response.ok;
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ WhatsApp Service response:', result.message);
+                return true;
+            }
+            return false;
         }
         catch (error) {
             console.error('❌ Erro ao conectar WhatsApp Service:', error);
@@ -127,13 +145,49 @@ class WhatsAppClient {
     async disconnect() {
         try {
             const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/disconnect`, {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: AbortSignal.timeout(10000)
             });
             return response.ok;
         }
         catch (error) {
             console.error('❌ Erro ao desconectar WhatsApp Service:', error);
             return false;
+        }
+    }
+    async getQRCode() {
+        try {
+            const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/qr`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: AbortSignal.timeout(10000)
+            });
+            if (!response.ok) {
+                return {
+                    success: false,
+                    qrCode: null,
+                    message: 'Erro ao obter QR Code do WhatsApp Service'
+                };
+            }
+            const result = await response.json();
+            return {
+                success: result.success || false,
+                qrCode: result.qrCode || null,
+                message: result.message || 'QR Code não disponível'
+            };
+        }
+        catch (error) {
+            console.error('❌ Erro ao obter QR Code:', error);
+            return {
+                success: false,
+                qrCode: null,
+                message: 'WhatsApp Service indisponível'
+            };
         }
     }
 }

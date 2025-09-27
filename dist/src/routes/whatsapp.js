@@ -28,6 +28,29 @@ router.get('/status', async (req, res) => {
     }
 });
 /**
+ * @route GET /api/whatsapp/qr
+ * @desc Obter QR code para conexão WhatsApp
+ * @access Private (Admin)
+ */
+router.get('/qr', async (req, res) => {
+    try {
+        const qrResult = await whatsappClient_1.default.getQRCode();
+        res.json({
+            success: qrResult.success,
+            qrCode: qrResult.qrCode,
+            message: qrResult.message
+        });
+    }
+    catch (error) {
+        console.error('Erro ao obter QR code:', error);
+        res.status(500).json({
+            success: false,
+            qrCode: null,
+            message: 'Erro ao obter QR code'
+        });
+    }
+});
+/**
  * @route POST /api/whatsapp/initialize
  * @desc Inicializar conexão WhatsApp
  * @access Private (Admin)
@@ -36,8 +59,8 @@ router.post('/initialize', async (req, res) => {
     try {
         const success = await whatsappClient_1.default.connect();
         res.json({
-            success: true,
-            message: 'WhatsApp inicializando... Aguarde o QR code no console do servidor.'
+            success: success,
+            message: success ? 'WhatsApp inicializando... Aguarde QR code ou conexão automática.' : 'Erro ao inicializar WhatsApp'
         });
     }
     catch (error) {
@@ -177,6 +200,33 @@ router.post('/disconnect', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Erro ao desconectar WhatsApp'
+        });
+    }
+});
+/**
+ * @route POST /api/whatsapp/reset
+ * @desc Reset WhatsApp connection (disconnect + reconnect)
+ * @access Private (Admin)
+ */
+router.post('/reset', async (req, res) => {
+    try {
+        console.log('🔄 Resetando conexão WhatsApp...');
+        // First disconnect
+        await whatsappClient_1.default.disconnect();
+        // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Then reconnect
+        const success = await whatsappClient_1.default.connect();
+        res.json({
+            success: success,
+            message: success ? 'WhatsApp resetado com sucesso' : 'Falha ao resetar WhatsApp'
+        });
+    }
+    catch (error) {
+        console.error('Erro ao resetar WhatsApp:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erro ao resetar WhatsApp'
         });
     }
 });

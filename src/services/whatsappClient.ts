@@ -134,7 +134,7 @@ class WhatsAppClient {
         };
       }
 
-      const result = await response.json();
+      const result = await response.json() as { connected?: boolean; message?: string };
       return {
         connected: result.connected || false,
         message: result.message || 'Status desconhecido'
@@ -159,7 +159,7 @@ class WhatsAppClient {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = await response.json() as { message?: string };
         console.log('✅ WhatsApp Service response:', result.message);
         return true;
       }
@@ -205,7 +205,7 @@ class WhatsAppClient {
         };
       }
 
-      const result = await response.json();
+      const result = await response.json() as { success?: boolean; qrCode?: string; message?: string };
       return {
         success: result.success || false,
         qrCode: result.qrCode || null,

@@ -118,8 +118,8 @@ exports.completeService = (0, asyncHandler_1.authenticatedHandler)(async (req, r
             // Buscar dados completos do agendamento com informações do cliente
             const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user);
             if (agendamentoCompleto?.usuario_telefone) {
-                const whatsappService = require('../services/whatsappService').default;
-                const enviado = await whatsappService.sendServiceCompletedNotification(agendamentoCompleto.usuario_nome || 'Cliente', agendamentoCompleto.usuario_telefone, agendamentoCompleto.servico_nome || 'Serviço', agendamentoCompleto.modelo_veiculo, agendamentoCompleto.placa);
+                const whatsappClient = require('../services/whatsappClient').default;
+                const enviado = await whatsappClient.sendServiceCompletedNotification(agendamentoCompleto.usuario_nome || 'Cliente', agendamentoCompleto.usuario_telefone, agendamentoCompleto.servico_nome || 'Serviço', agendamentoCompleto.modelo_veiculo, agendamentoCompleto.placa);
                 console.log("📱 WhatsApp enviado:", enviado);
                 res.json({
                     ...updated,
