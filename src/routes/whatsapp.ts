@@ -25,6 +25,29 @@ router.get('/status', async (req, res) => {
 });
 
 /**
+ * @route GET /api/whatsapp/qr
+ * @desc Obter QR code para conexão WhatsApp
+ * @access Private (Admin)
+ */
+router.get('/qr', async (req, res) => {
+  try {
+    const qrResult = await whatsappClient.getQRCode();
+    res.json({
+      success: qrResult.success,
+      qrCode: qrResult.qrCode,
+      message: qrResult.message
+    });
+  } catch (error) {
+    console.error('Erro ao obter QR code:', error);
+    res.status(500).json({
+      success: false,
+      qrCode: null,
+      message: 'Erro ao obter QR code'
+    });
+  }
+});
+
+/**
  * @route POST /api/whatsapp/initialize
  * @desc Inicializar conexão WhatsApp
  * @access Private (Admin)
@@ -33,8 +56,8 @@ router.post('/initialize', async (req, res) => {
   try {
     const success = await whatsappClient.connect();
     res.json({
-      success: true,
-      message: 'WhatsApp inicializando... Aguarde o QR code no console do servidor.'
+      success: success,
+      message: success ? 'WhatsApp inicializando... Aguarde QR code ou conexão automática.' : 'Erro ao inicializar WhatsApp'
     });
   } catch (error) {
     console.error('Erro ao inicializar WhatsApp:', error);
