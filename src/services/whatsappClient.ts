@@ -40,7 +40,7 @@ class WhatsAppClient {
       const result = await response.json();
       console.log('✅ Resposta do WhatsApp Service:', result);
 
-      return result.success || false;
+      return (result as { success?: boolean }).success || false;
     } catch (error) {
       console.error('❌ Erro ao comunicar com WhatsApp Service:', error);
       return false;
@@ -80,7 +80,7 @@ class WhatsAppClient {
       const result = await response.json();
       console.log('✅ Resposta do WhatsApp Service:', result);
 
-      return result.success || false;
+      return (result as { success?: boolean }).success || false;
     } catch (error) {
       console.error('❌ Erro ao comunicar com WhatsApp Service:', error);
       return false;
@@ -110,7 +110,7 @@ class WhatsAppClient {
       const result = await response.json();
       console.log('✅ Resposta do WhatsApp Service:', result);
 
-      return result.success || false;
+      return (result as { success?: boolean }).success || false;
     } catch (error) {
       console.error('❌ Erro ao comunicar com WhatsApp Service:', error);
       return false;
@@ -129,7 +129,7 @@ class WhatsAppClient {
       }
 
       const result = await response.json();
-      return result;
+      return result as { connected: boolean; message: string; };
     } catch (error) {
       console.error('❌ Erro ao verificar status do WhatsApp Service:', error);
       return {

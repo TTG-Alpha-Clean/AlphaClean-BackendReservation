@@ -151,17 +151,19 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
-// ===== START SERVER =====
-const PORT = process.env.PORT || 3001;
+// ===== START SERVER (only in non-serverless environments) =====
+if (process.env.VERCEL !== '1' && !module.parent) {
+    const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, async () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`🔒 Segurança: Helmet + Rate Limiting habilitados`);
-    console.log(`🌍 CORS permitido para: ${ALLOWED_ORIGINS.join(', ')}`);
-    console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    app.listen(PORT, async () => {
+        console.log(`🚀 Servidor rodando na porta ${PORT}`);
+        console.log(`🔒 Segurança: Helmet + Rate Limiting habilitados`);
+        console.log(`🌍 CORS permitido para: ${ALLOWED_ORIGINS.join(', ')}`);
+        console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
 
-    // WhatsApp será inicializado via admin panel
-    console.log('📱 WhatsApp disponível via admin panel');
-});
+        // WhatsApp será inicializado via admin panel
+        console.log('📱 WhatsApp disponível via admin panel');
+    });
+}
 
 export default app;

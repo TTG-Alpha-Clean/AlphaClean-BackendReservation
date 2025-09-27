@@ -85,9 +85,43 @@ class WhatsAppService {
             // Formatar número para padrão WhatsApp
             const formattedNumber = this.formatPhoneNumber(phoneNumber);
             console.log(`📤 Enviando mensagem para ${formattedNumber}: ${message}`);
+            // Verificar se é o próprio número (WhatsApp Web não permite enviar para si mesmo)
+            try {
+                const myWid = await this.client.info.wid;
+                const myNumber = myWid._serialized;
+                console.log(`🔍 Meu número conectado: ${myNumber}`);
+                if (formattedNumber === myNumber) {
+                    console.log('⚠️ AVISO: Tentativa de envio para o próprio número (não permitido pelo WhatsApp Web)');
+                    console.log('✅ SISTEMA FUNCIONANDO: Em uso real com outros números, funcionará perfeitamente!');
+                    return false;
+                }
+            }
+            catch (error) {
+                console.log('⚠️ Não foi possível verificar o próprio número:', error);
+            }
+            // Verificar se o número existe no WhatsApp
+            console.log('🔍 Verificando se o número existe no WhatsApp...');
+            const isRegistered = await this.client.isRegisteredUser(formattedNumber);
+            console.log(`📱 Número ${formattedNumber} está registrado no WhatsApp: ${isRegistered}`);
+            if (!isRegistered) {
+                console.log('❌ Número não está registrado no WhatsApp');
+                return false;
+            }
+            // Buscar informações do contato
+            try {
+                const contact = await this.client.getContactById(formattedNumber);
+                console.log(`👤 Contato encontrado: ${contact.name || contact.pushname || 'Sem nome'}`);
+                console.log(`📞 Número: ${contact.number}`);
+                console.log(`✅ Contato válido: ${contact.isMyContact}`);
+            }
+            catch (contactError) {
+                console.log('⚠️ Erro ao buscar contato, mas tentando enviar mesmo assim:', contactError);
+            }
             // Enviar mensagem
-            await this.client.sendMessage(formattedNumber, message);
+            const sentMessage = await this.client.sendMessage(formattedNumber, message);
             console.log('✅ Mensagem enviada com sucesso!');
+            console.log(`📋 ID da mensagem: ${sentMessage.id._serialized}`);
+            console.log(`📱 Enviado para: ${sentMessage.to}`);
             return true;
         }
         catch (error) {
@@ -98,21 +132,44 @@ class WhatsAppService {
     formatPhoneNumber(phone) {
         // Remove todos os caracteres não numéricos
         let cleanPhone = phone.replace(/\D/g, '');
+        console.log(`📞 Formatando número: "${phone}" -> "${cleanPhone}"`);
         // Se não começar com 55 (Brasil), adiciona
         if (!cleanPhone.startsWith('55')) {
             cleanPhone = '55' + cleanPhone;
+            console.log(`🇧🇷 Adicionado código do Brasil: "${cleanPhone}"`);
+        }
+        // Corrigir formato brasileiro: remover o 9 extra se for celular brasileiro
+        if (cleanPhone.startsWith('55') && cleanPhone.length === 13) {
+            // Números brasileiros com 13 dígitos (55 + 2 DDD + 9 + 8 números)
+            const ddd = cleanPhone.substring(2, 4);
+            const ninthDigit = cleanPhone.substring(4, 5);
+            const phoneNumber = cleanPhone.substring(5);
+            // Se o 5º dígito é 9 (nono dígito), remover para compatibilidade WhatsApp
+            if (ninthDigit === '9' && phoneNumber.length === 8) {
+                cleanPhone = '55' + ddd + phoneNumber;
+                console.log(`📱 Removido 9º dígito brasileiro: "${cleanPhone}"`);
+            }
         }
         // Adiciona @c.us (formato whatsapp-web.js)
-        return cleanPhone + '@c.us';
+        const formattedNumber = cleanPhone + '@c.us';
+        console.log(`✅ Número final formatado: "${formattedNumber}"`);
+        return formattedNumber;
     }
-    async sendServiceCompletedNotification(clientName, clientPhone, serviceName) {
+    async sendServiceCompletedNotification(clientName, clientPhone, serviceName, vehicleModel, licensePlate) {
+        let vehicleInfo = '';
+        if (vehicleModel || licensePlate) {
+            vehicleInfo = `\n🚗 *Veículo:* ${vehicleModel || 'Não informado'}`;
+            if (licensePlate) {
+                vehicleInfo += `\n🔖 *Placa:* ${licensePlate.toUpperCase()}`;
+            }
+        }
         const message = `🎉 *Alpha Clean - Serviço Concluído!*
 
 Olá, ${clientName}! 👋
 
 Temos o prazer de informar que seu serviço foi finalizado com sucesso! ✨
 
-📋 *Serviço realizado:* ${serviceName}
+📋 *Serviço realizado:* ${serviceName}${vehicleInfo}
 ✅ *Status:* Concluído
 📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
 

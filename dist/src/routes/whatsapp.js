@@ -4,16 +4,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const whatsappService_1 = __importDefault(require("../services/whatsappService"));
+const whatsappClient_1 = __importDefault(require("../services/whatsappClient"));
 const router = (0, express_1.Router)();
 /**
  * @route GET /api/whatsapp/status
  * @desc Verificar status da conexão WhatsApp
  * @access Private (Admin)
  */
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
     try {
-        const status = whatsappService_1.default.getConnectionStatus();
+        const status = await whatsappClient_1.default.getConnectionStatus();
         res.json({
             success: true,
             data: status
@@ -34,7 +34,7 @@ router.get('/status', (req, res) => {
  */
 router.post('/initialize', async (req, res) => {
     try {
-        await whatsappService_1.default.initialize();
+        const success = await whatsappClient_1.default.connect();
         res.json({
             success: true,
             message: 'WhatsApp inicializando... Aguarde o QR code no console do servidor.'
@@ -63,7 +63,7 @@ router.post('/send-test', async (req, res) => {
             });
             return;
         }
-        const sent = await whatsappService_1.default.testMessage(phoneNumber);
+        const sent = await whatsappClient_1.default.testMessage(phoneNumber);
         if (sent) {
             res.json({
                 success: true,
@@ -100,7 +100,7 @@ router.post('/send-completion', async (req, res) => {
             });
             return;
         }
-        const sent = await whatsappService_1.default.sendServiceCompletedNotification(clientName, clientPhone, serviceName);
+        const sent = await whatsappClient_1.default.sendServiceCompletedNotification(clientName, clientPhone, serviceName);
         if (sent) {
             res.json({
                 success: true,
@@ -137,7 +137,7 @@ router.post('/send-reminder', async (req, res) => {
             });
             return;
         }
-        const sent = await whatsappService_1.default.sendReminderNotification(clientName, clientPhone, serviceName, date, time);
+        const sent = await whatsappClient_1.default.sendReminderNotification(clientName, clientPhone, serviceName, date, time);
         if (sent) {
             res.json({
                 success: true,
@@ -166,7 +166,7 @@ router.post('/send-reminder', async (req, res) => {
  */
 router.post('/disconnect', async (req, res) => {
     try {
-        await whatsappService_1.default.disconnect();
+        await whatsappClient_1.default.disconnect();
         res.json({
             success: true,
             message: 'WhatsApp desconectado com sucesso'

@@ -62,7 +62,7 @@ router.post('/send-test', async (req, res): Promise<void> => {
       return;
     }
 
-    const sent = await whatsappService.testMessage(phoneNumber);
+    const sent = await whatsappClient.testMessage(phoneNumber);
 
     if (sent) {
       res.json({
@@ -101,7 +101,7 @@ router.post('/send-completion', async (req, res): Promise<void> => {
       return;
     }
 
-    const sent = await whatsappService.sendServiceCompletedNotification(
+    const sent = await whatsappClient.sendServiceCompletedNotification(
       clientName,
       clientPhone,
       serviceName
@@ -144,7 +144,7 @@ router.post('/send-reminder', async (req, res): Promise<void> => {
       return;
     }
 
-    const sent = await whatsappService.sendReminderNotification(
+    const sent = await whatsappClient.sendReminderNotification(
       clientName,
       clientPhone,
       serviceName,
@@ -179,7 +179,7 @@ router.post('/send-reminder', async (req, res): Promise<void> => {
  */
 router.post('/disconnect', async (req, res) => {
   try {
-    await whatsappService.disconnect();
+    await whatsappClient.disconnect();
     res.json({
       success: true,
       message: 'WhatsApp desconectado com sucesso'
