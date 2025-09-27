@@ -12,7 +12,7 @@ console.log("🚀 Starting Alpha Clean Backend...");
 console.log("📊 NODE_ENV:", process.env.NODE_ENV);
 console.log("🌍 VERCEL:", process.env.VERCEL);
 console.log("🔗 DATABASE_URL:", process.env.DATABASE_URL ? "✅ Set" : "❌ Missing");
-// ✅ IMPORTS DE SEGURANÇA
+// ✅ IMPORTS DE SEGURANÇA E BANCO
 let securityMiddlewares;
 let pool;
 try {
@@ -25,7 +25,8 @@ catch (error) {
 }
 try {
     console.log("🗄️ Loading database connection...");
-    pool = require("./src/database/index").pool;
+    const dbModule = require("./src/database/index");
+    pool = dbModule.pool;
     console.log("✅ Database connection loaded");
 }
 catch (error) {
@@ -136,6 +137,9 @@ app.get("/health", (req, res) => {
 });
 app.get("/ping", async (req, res) => {
     try {
+        if (!pool) {
+            throw new Error("Database pool not initialized");
+        }
         const result = await pool.query("SELECT NOW()");
         res.json({
             status: "ok",
@@ -148,7 +152,7 @@ app.get("/ping", async (req, res) => {
         res.status(500).json({
             status: "error",
             database: "disconnected",
-            error: "Database connection failed"
+            error: error instanceof Error ? error.message : "Database connection failed"
         });
     }
 });
@@ -168,12 +172,16 @@ app.use(errorHandler_1.default);
 // ===== GRACEFUL SHUTDOWN =====
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
-    await pool.end();
+    if (pool) {
+        await pool.end();
+    }
     process.exit(0);
 });
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
-    await pool.end();
+    if (pool) {
+        await pool.end();
+    }
     process.exit(0);
 });
 // ===== START SERVER (only in non-serverless environments) =====
