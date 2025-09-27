@@ -9,9 +9,8 @@ console.log("📊 NODE_ENV:", process.env.NODE_ENV);
 console.log("🌍 VERCEL:", process.env.VERCEL);
 console.log("🔗 DATABASE_URL:", process.env.DATABASE_URL ? "✅ Set" : "❌ Missing");
 
-// ✅ IMPORTS DE SEGURANÇA E BANCO
+// ✅ IMPORTS DE SEGURANÇA
 let securityMiddlewares;
-let pool;
 
 try {
     console.log("📦 Loading security middlewares...");
@@ -21,19 +20,8 @@ try {
     console.error("❌ Failed to load security middlewares:", error);
 }
 
-try {
-    console.log("🗄️ Loading database connection...");
-    console.log("🔍 DATABASE_URL available:", !!process.env.DATABASE_URL);
-    console.log("🔍 DATABASE_URL starts with:", process.env.DATABASE_URL?.substring(0, 20) + "...");
-
-    const dbModule = require("./src/database/index");
-    pool = dbModule.pool;
-    console.log("✅ Database connection loaded");
-    console.log("🔍 Pool object:", !!pool);
-} catch (error) {
-    console.error("❌ Failed to load database connection:", error);
-    console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
-}
+// database
+import { pool } from "./src/database/index";
 
 // rotas
 import authRoutes from "./src/routes/authRoutes";
@@ -173,21 +161,16 @@ app.get("/health", (req, res) => {
 app.get("/ping", async (req, res) => {
     try {
         console.log("🔍 Ping endpoint called");
-        console.log("🔍 Pool available:", !!pool);
         console.log("🔍 DATABASE_URL set:", !!process.env.DATABASE_URL);
 
-        if (!pool) {
-            throw new Error("Database pool not initialized");
-        }
-
         console.log("🔍 Attempting database query...");
-        const result = await pool.query("SELECT NOW()");
+        const result = await pool.query("SELECT NOW() as current_time");
         console.log("✅ Database query successful");
 
         res.json({
             status: "ok",
             database: "connected",
-            timestamp: result.rows[0].now
+            timestamp: result.rows[0].current_time
         });
     } catch (error) {
         console.error("❌ Erro ao conectar no banco:", error);
@@ -197,8 +180,8 @@ app.get("/ping", async (req, res) => {
             database: "disconnected",
             error: error instanceof Error ? error.message : "Database connection failed",
             details: {
-                poolAvailable: !!pool,
-                databaseUrlSet: !!process.env.DATABASE_URL
+                databaseUrlSet: !!process.env.DATABASE_URL,
+                nodeEnv: process.env.NODE_ENV
             }
         });
     }
@@ -224,16 +207,20 @@ app.use(errorHandler);
 // ===== GRACEFUL SHUTDOWN =====
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
-    if (pool) {
+    try {
         await pool.end();
+    } catch (error) {
+        console.error('Error closing pool:', error);
     }
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
-    if (pool) {
+    try {
         await pool.end();
+    } catch (error) {
+        console.error('Error closing pool:', error);
     }
     process.exit(0);
 });
