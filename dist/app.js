@@ -23,13 +23,7 @@ catch (error) {
     console.error("❌ Failed to load security middlewares:", error);
 }
 // database
-const pg_1 = __importDefault(require("pg"));
-const { Pool } = pg_1.default;
-// Criar pool simples para teste
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+const index_1 = require("./src/database/index");
 // rotas
 const authRoutes_1 = __importDefault(require("./src/routes/authRoutes"));
 const userRoutes_1 = __importDefault(require("./src/routes/userRoutes"));
@@ -157,7 +151,7 @@ app.get("/ping", async (req, res) => {
         console.log("🔍 Ping endpoint called");
         console.log("🔍 DATABASE_URL set:", !!process.env.DATABASE_URL);
         console.log("🔍 Attempting database query...");
-        const result = await pool.query("SELECT NOW() as current_time");
+        const result = await index_1.pool.query("SELECT NOW() as current_time");
         console.log("✅ Database query successful");
         res.json({
             status: "ok",
@@ -196,7 +190,7 @@ app.use(errorHandler_1.default);
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
     try {
-        await pool.end();
+        await index_1.pool.end();
     }
     catch (error) {
         console.error('Error closing pool:', error);
@@ -206,7 +200,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
     try {
-        await pool.end();
+        await index_1.pool.end();
     }
     catch (error) {
         console.error('Error closing pool:', error);

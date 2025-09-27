@@ -6,34 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.checkConnection = checkConnection;
 exports.queryWithRetry = queryWithRetry;
-// src/database/index.ts - VERSÃO TYPESCRIPT CORRIGIDA
+// src/database/index.ts - VERSÃO SIMPLIFICADA PARA VERCEL
 const pg_1 = __importDefault(require("pg"));
 require("dotenv/config");
 const { Pool } = pg_1.default;
-let connectionString = process.env.DATABASE_URL || "";
-// 1) garantir sslmode=require na URL
-if (connectionString && !/sslmode=/i.test(connectionString)) {
-    connectionString += (connectionString.includes("?") ? "&" : "?") + "sslmode=require";
-}
-// 2) decidir se precisa SSL (Supabase/DB_SSL=true)
-const needsSSL = process.env.DB_SSL === "true" ||
-    /supabase\.com/i.test(connectionString) ||
-    /aws|gcp|azure|neon\.tech|render\.com/i.test(connectionString);
-// 3) objeto SSL para o driver 'pg'
-const ssl = needsSSL ? { rejectUnauthorized: false } : false;
-// 4) paraquedas DEV: evita falha com cadeia autoassinada no Windows/proxy
-if (needsSSL && process.env.NODE_ENV !== "production") {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
-// ✅ EXPORTAÇÃO NOMEADA DO POOL (compatível com JS)
+// ✅ POOL SIMPLIFICADO - mesmo do app.ts
 exports.pool = new Pool({
-    connectionString,
-    ssl,
-    keepAlive: true,
-    max: 20,
-    min: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 // Eventos do pool
 exports.pool.on("error", (err, client) => {

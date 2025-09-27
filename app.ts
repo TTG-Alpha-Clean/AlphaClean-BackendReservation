@@ -21,14 +21,7 @@ try {
 }
 
 // database
-import pg from "pg";
-const { Pool } = pg;
-
-// Criar pool simples para teste
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+import { pool } from "./src/database/index";
 
 // rotas
 import authRoutes from "./src/routes/authRoutes";
