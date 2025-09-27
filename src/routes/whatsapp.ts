@@ -216,4 +216,35 @@ router.post('/disconnect', async (req, res) => {
   }
 });
 
+/**
+ * @route POST /api/whatsapp/reset
+ * @desc Reset WhatsApp connection (disconnect + reconnect)
+ * @access Private (Admin)
+ */
+router.post('/reset', async (req, res) => {
+  try {
+    console.log('🔄 Resetando conexão WhatsApp...');
+
+    // First disconnect
+    await whatsappClient.disconnect();
+
+    // Wait 2 seconds
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Then reconnect
+    const success = await whatsappClient.connect();
+
+    res.json({
+      success: success,
+      message: success ? 'WhatsApp resetado com sucesso' : 'Falha ao resetar WhatsApp'
+    });
+  } catch (error) {
+    console.error('Erro ao resetar WhatsApp:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao resetar WhatsApp'
+    });
+  }
+});
+
 export default router;
