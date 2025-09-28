@@ -7,6 +7,12 @@ class WhatsAppClient {
     this.whatsappServiceUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3002';
   }
 
+  private isWhatsAppServiceAvailable(): boolean {
+    // Verifica se o serviço WhatsApp está configurado
+    // Em produção, retorna false se não houver URL configurada
+    return !!process.env.WHATSAPP_SERVICE_URL || process.env.NODE_ENV === 'development';
+  }
+
   async sendServiceCompletedNotification(
     clientName: string,
     clientPhone: string,
@@ -14,6 +20,12 @@ class WhatsAppClient {
     vehicleModel?: string,
     licensePlate?: string
   ): Promise<boolean> {
+    // Verificar se o serviço WhatsApp está disponível
+    if (!this.isWhatsAppServiceAvailable()) {
+      console.log('ℹ️ WhatsApp service não disponível em produção - notificação ignorada');
+      return true; // Retorna true para não bloquear o fluxo
+    }
+
     try {
       console.log('📤 Enviando notificação de conclusão via WhatsApp Service...');
 
@@ -54,6 +66,12 @@ class WhatsAppClient {
     date: string,
     time: string
   ): Promise<boolean> {
+    // Verificar se o serviço WhatsApp está disponível
+    if (!this.isWhatsAppServiceAvailable()) {
+      console.log('ℹ️ WhatsApp service não disponível em produção - lembrete ignorado');
+      return true; // Retorna true para não bloquear o fluxo
+    }
+
     try {
       console.log('📤 Enviando lembrete via WhatsApp Service...');
 
