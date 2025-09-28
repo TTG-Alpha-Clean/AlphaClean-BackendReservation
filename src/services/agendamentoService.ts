@@ -86,9 +86,14 @@ function parseStatusFilter(status?: string): string[] | null {
 
 // Funções auxiliares
 export function isPastDateTime(data: string, horario: string): boolean {
-    const agendamento = new Date(`${data}T${horario}:00`);
+    // Criar a data do agendamento no fuso horário de São Paulo
+    const agendamento = new Date(`${data}T${horario}:00-03:00`);
+
+    // Obter a data atual no fuso horário de São Paulo
     const agora = new Date();
-    return agendamento < agora;
+    const agoraSaoPaulo = new Date(agora.toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+
+    return agendamento < agoraSaoPaulo;
 }
 
 export function sanitizePlate(placa: string): string {
