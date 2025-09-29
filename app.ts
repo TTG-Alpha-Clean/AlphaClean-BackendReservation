@@ -31,6 +31,7 @@ import servicosRoutes from "./src/routes/servicoRoutes";
 import servicesRoutes from "./src/routes/servicesRoutes";
 import adminRoutes from "./src/routes/adminRoutes";
 import whatsappRoutes from "./src/routes/whatsapp";
+import carRoutes from "./src/routes/carRoutes";
 
 // services (WhatsApp será carregado dinamicamente)
 
@@ -203,6 +204,7 @@ app.use("/api/agendamentos", agendamentosRoutes);
 app.use("/api/servicos", servicosRoutes);
 app.use("/api/services", servicesRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/cars", carRoutes);
 
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound);
