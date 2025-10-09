@@ -63,7 +63,7 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
     limit ${page_size} offset ${offset}`;
 
     const { rows } = await pool.query(q, params);
-    const { rows: [{ count }] } = await pool.query(`select count(*)::int as count from usuarios ${whereSQL}`, params);
+    const { rows: [{ count }] } = await pool.query(`select count(distinct u.id)::int as count from usuarios u ${whereSQL}`, params);
 
     // Formatar resposta para o frontend
     const formattedData = rows.map((user: any) => ({
