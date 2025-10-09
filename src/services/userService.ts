@@ -32,16 +32,52 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
     const offset = (page - 1) * page_size;
 
     const q = `
-    select id, nome, email, active, role, created_at, updated_at
-    from usuarios
+    select
+        u.id,
+        u.nome,
+        u.email,
+        u.active,
+        u.role,
+        u.created_at,
+        u.updated_at,
+        json_agg(
+            distinct jsonb_build_object(
+                'telefone', t.telefone
+            )
+        ) filter (where t.telefone is not null) as telefones,
+        json_agg(
+            distinct jsonb_build_object(
+                '_id', c.id,
+                'brand', c.marca,
+                'model', c.modelo,
+                'year', c.ano,
+                'licensePlate', c.placa
+            )
+        ) filter (where c.id is not null) as cars
+    from usuarios u
+    left join telefones t on t.usuario_id = u.id
+    left join carros c on c.usuario_id = u.id
     ${whereSQL}
-    order by created_at desc
+    group by u.id
+    order by u.created_at desc
     limit ${page_size} offset ${offset}`;
 
     const { rows } = await pool.query(q, params);
     const { rows: [{ count }] } = await pool.query(`select count(*)::int as count from usuarios ${whereSQL}`, params);
 
-    return { data: rows, page, page_size, total: count };
+    // Formatar resposta para o frontend
+    const formattedData = rows.map((user: any) => ({
+        _id: user.id,
+        name: user.nome,
+        email: user.email,
+        phone: user.telefones && user.telefones.length > 0 ? user.telefones[0].telefone : '',
+        active: user.active,
+        role: user.role,
+        createdAt: user.created_at,
+        cars: user.cars || []
+    }));
+
+    return { data: formattedData, page, page_size, total: count };
 }
 
 export async function createUser({ nome, email, senha, role = "user", telefones = [] }: any): Promise<any> {
