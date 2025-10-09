@@ -44,15 +44,15 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
 
     // Buscar telefones e carros separadamente para cada usuário
     const formattedData = await Promise.all(rows.map(async (user: any) => {
-        // Buscar telefones
+        // Buscar telefones (ddd + numero em formato E.164)
         const { rows: phones } = await pool.query(
-            'select telefone from telefones where usuario_id = $1 limit 1',
+            'select ddd, numero, e164 from telefones where usuario_id = $1 limit 1',
             [user.id]
         );
 
         // Buscar carros
         const { rows: cars } = await pool.query(
-            'select id, marca, modelo, ano, placa from carros where usuario_id = $1',
+            'select id, marca, modelo_veiculo as modelo, ano, placa from cars where usuario_id = $1 and ativo = true',
             [user.id]
         );
 
@@ -60,15 +60,15 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
             _id: user.id,
             name: user.nome,
             email: user.email,
-            phone: phones.length > 0 ? phones[0].telefone : '',
+            phone: phones.length > 0 ? (phones[0].e164 || `+55${phones[0].ddd}${phones[0].numero}`) : '',
             active: user.active,
             role: user.role,
             createdAt: user.created_at,
             cars: cars.map((car: any) => ({
                 _id: car.id,
-                brand: car.marca,
+                brand: car.marca || '',
                 model: car.modelo,
-                year: car.ano,
+                year: car.ano || '',
                 licensePlate: car.placa
             }))
         };
