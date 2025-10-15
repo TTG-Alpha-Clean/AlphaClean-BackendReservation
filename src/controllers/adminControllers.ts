@@ -24,8 +24,7 @@ export async function adminLogin(req: Request, res: Response): Promise<Response>
       id: result.admin.id,
       nome: result.admin.nome,
       email: result.admin.email,
-      role: 'admin',
-      active: true
+      role: 'admin'
     }
   });
 }

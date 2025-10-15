@@ -32,6 +32,7 @@ const servicoRoutes_1 = __importDefault(require("./src/routes/servicoRoutes"));
 const servicesRoutes_1 = __importDefault(require("./src/routes/servicesRoutes"));
 const adminRoutes_1 = __importDefault(require("./src/routes/adminRoutes"));
 const whatsapp_1 = __importDefault(require("./src/routes/whatsapp"));
+const carRoutes_1 = __importDefault(require("./src/routes/carRoutes"));
 // services (WhatsApp será carregado dinamicamente)
 // middlewares
 const notFound_1 = __importDefault(require("./src/middlewares/notFound"));
@@ -39,7 +40,9 @@ const errorHandler_1 = __importDefault(require("./src/middlewares/errorHandler")
 // ===== CORS (com credenciais) =====
 const DEFAULT_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3004",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3004",
     "https://alpha-clean-pearl.vercel.app"
 ];
 const ENV_ORIGINS = (process.env.CORS_ORIGINS || "")
@@ -183,6 +186,7 @@ app.use("/api/agendamentos", agendamentoRoutes_1.default);
 app.use("/api/servicos", servicoRoutes_1.default);
 app.use("/api/services", servicesRoutes_1.default);
 app.use("/api/whatsapp", whatsapp_1.default);
+app.use("/api/cars", carRoutes_1.default);
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound_1.default);
 app.use(errorHandler_1.default);

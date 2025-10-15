@@ -48,9 +48,12 @@ function parseStatusFilter(status) {
 }
 // Funções auxiliares
 function isPastDateTime(data, horario) {
-    const agendamento = new Date(`${data}T${horario}:00`);
+    // Criar a data do agendamento no fuso horário de São Paulo
+    const agendamento = new Date(`${data}T${horario}:00-03:00`);
+    // Obter a data atual no fuso horário de São Paulo
     const agora = new Date();
-    return agendamento < agora;
+    const agoraSaoPaulo = new Date(agora.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    return agendamento < agoraSaoPaulo;
 }
 function sanitizePlate(placa) {
     if (!placa)
@@ -145,23 +148,25 @@ async function list(filters) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            s.nome as servico_nome,
-            s.valor as servico_valor
+            COALESCE(serv.title, s.nome) as servico_nome,
+            COALESCE(serv.valor, s.valor) as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
         `
         : `
-        SELECT 
+        SELECT
             a.*,
-            s.nome as servico_nome,
-            s.valor as servico_valor
+            COALESCE(serv.title, s.nome) as servico_nome,
+            COALESCE(serv.valor, s.valor) as servico_valor
         FROM agendamentos a
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
@@ -200,21 +205,23 @@ async function getByIdWithClientInfo(id, user) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            s.nome as servico_nome,
-            s.valor as servico_valor
+            COALESCE(serv.title, s.nome) as servico_nome,
+            COALESCE(serv.valor, s.valor) as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         WHERE a.id = $1
         `
         : `
-        SELECT 
+        SELECT
             a.*,
-            s.nome as servico_nome,
-            s.valor as servico_valor
+            COALESCE(serv.title, s.nome) as servico_nome,
+            COALESCE(serv.valor, s.valor) as servico_valor
         FROM agendamentos a
         LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
         WHERE a.id = $1 AND a.usuario_id = $2
         `;
     const params = isAdmin ? [id] : [id, user.id];
@@ -263,9 +270,13 @@ async function create(payload) {
     if (used >= SCHEDULE.MAX_CONCURRENT) {
         throw new apiError_1.default(409, "Horário esgotado");
     }
-    // Verificar se o serviço existe
-    const { rows: servicoRows } = await index_1.pool.query('SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true', [servico_id]);
-    if (!servicoRows[0]) {
+    // Verificar se o serviço existe (tenta primeiro na tabela services, depois em servicos)
+    let servicoRows = await index_1.pool.query('SELECT id, title as nome, valor FROM services WHERE id = $1 AND deleted_at IS NULL', [servico_id]);
+    // Se não encontrou em services, tenta em servicos (backward compatibility)
+    if (!servicoRows.rows[0]) {
+        servicoRows = await index_1.pool.query('SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true', [servico_id]);
+    }
+    if (!servicoRows.rows[0]) {
         throw new apiError_1.default(400, "Serviço não encontrado ou inativo");
     }
     const dupQ = `

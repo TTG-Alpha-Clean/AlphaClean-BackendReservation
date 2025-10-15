@@ -34,10 +34,12 @@ export async function createService(
 export async function getAllServices(): Promise<any[]> {
   const result = await pool.query(`
     SELECT
+      s.id,
       s.id AS service_id,
       s.type,
       s.title,
       s.subtitle,
+      s.valor,
       s.valor AS price,
       s.time_minutes AS time,
       s.description AS service_description,
@@ -127,4 +129,29 @@ export async function deleteService(id: string): Promise<any | null> {
   );
 
   return result.rows[0] || null;
+}
+
+// CREATE SERVICE INFORMATIONS
+export async function createServiceInformations(
+  serviceId: string,
+  informations: string[]
+): Promise<any[]> {
+  // Primeiro, remove as informações antigas
+  await pool.query(
+    `DELETE FROM service_informations WHERE service_id = $1`,
+    [serviceId]
+  );
+
+  // Depois, insere as novas informações
+  const insertPromises = informations.map((description) => {
+    return pool.query(
+      `INSERT INTO service_informations (service_id, description, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW())
+       RETURNING *`,
+      [serviceId, description]
+    );
+  });
+
+  const results = await Promise.all(insertPromises);
+  return results.map((result) => result.rows[0]);
 }

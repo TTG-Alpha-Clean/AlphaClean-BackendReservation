@@ -84,9 +84,12 @@ function assertStatusPayload(body) {
     return { status: body.status };
 }
 function isPastDateTime(data, horario) {
-    const agendamento = new Date(`${data}T${horario}:00`);
+    // Criar a data do agendamento no fuso horário de São Paulo
+    const agendamento = new Date(`${data}T${horario}:00-03:00`);
+    // Obter a data atual no fuso horário de São Paulo
     const agora = new Date();
-    return agendamento < agora;
+    const agoraSaoPaulo = new Date(agora.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    return agendamento < agoraSaoPaulo;
 }
 function sanitizePlate(placa) {
     if (!placa)

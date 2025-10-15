@@ -21,10 +21,14 @@ function isValidUuid(value: string): boolean {
 // CREATE
 export async function addService(req: MulterRequest, res: Response): Promise<Response> {
   try {
+    console.log('📝 CREATE SERVICE - Received data:', req.body);
+    console.log('📷 File:', req.file ? 'YES' : 'NO');
     const newService = await createService(req.body, req.file);
+    console.log('✅ Service created:', newService);
     return res.status(201).json(newService);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    console.error('❌ Error creating service:', err);
     return res.status(500).json({ error: message });
   }
 }
@@ -33,7 +37,8 @@ export async function addService(req: MulterRequest, res: Response): Promise<Res
 export async function listServices(_req: Request, res: Response): Promise<Response> {
   try {
     const services = await getAllServices();
-    return res.json(services);
+    // Retorna com wrapper 'data' para consistência com a API
+    return res.json({ data: services });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
     return res.status(500).json({ error: message });
@@ -91,6 +96,29 @@ export async function removeService(req: Request, res: Response): Promise<Respon
       return res.status(404).json({ error: 'Serviço não encontrado' });
     }
     return res.json({ message: 'Serviço excluído com sucesso', service: deleted });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    return res.status(500).json({ error: message });
+  }
+}
+
+// ADD INFORMATIONS
+export async function addServiceInformations(req: Request, res: Response): Promise<Response> {
+  try {
+    const serviceId = req.params.id;
+    if (!isValidUuid(serviceId)) {
+      return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+    }
+
+    const { informations } = req.body;
+    if (!Array.isArray(informations) || informations.length === 0) {
+      return res.status(400).json({ error: 'Informações inválidas' });
+    }
+
+    const { createServiceInformations } = await import('../services/servicesService');
+    const result = await createServiceInformations(serviceId, informations);
+
+    return res.status(201).json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
     return res.status(500).json({ error: message });

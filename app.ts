@@ -32,6 +32,7 @@ import servicesRoutes from "./src/routes/servicesRoutes";
 import adminRoutes from "./src/routes/adminRoutes";
 import whatsappRoutes from "./src/routes/whatsapp";
 import carRoutes from "./src/routes/carRoutes";
+import reportRoutes from "./src/routes/reports";
 
 // services (WhatsApp será carregado dinamicamente)
 
@@ -42,7 +43,9 @@ import errorHandler from "./src/middlewares/errorHandler";
 // ===== CORS (com credenciais) =====
 const DEFAULT_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3004",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3004",
     "https://alpha-clean-pearl.vercel.app"
 ];
 const ENV_ORIGINS = (process.env.CORS_ORIGINS || "")
@@ -205,6 +208,7 @@ app.use("/api/servicos", servicosRoutes);
 app.use("/api/services", servicesRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/cars", carRoutes);
+app.use("/api/reports", reportRoutes);
 
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound);

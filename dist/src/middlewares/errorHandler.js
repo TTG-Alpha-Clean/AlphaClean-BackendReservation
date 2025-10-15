@@ -80,13 +80,13 @@ function errorHandler(err, req, res, _next) {
         return;
     }
     // ✅ 5. Erros de timeout
-    if (err.name === 'TimeoutError' || err.message.includes('timeout')) {
+    if (err.name === 'TimeoutError' || (err.message && err.message.includes('timeout'))) {
         console.log("📤 Erro de timeout");
         sendErrorResponse(408, "Tempo limite esgotado");
         return;
     }
     // ✅ 6. Erros de conexão
-    if (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND')) {
+    if (err.message && (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND'))) {
         console.log("📤 Erro de conexão");
         sendErrorResponse(503, "Serviço indisponível");
         return;

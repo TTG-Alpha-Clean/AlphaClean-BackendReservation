@@ -5,6 +5,7 @@ exports.getAllServices = getAllServices;
 exports.getServiceById = getServiceById;
 exports.updateService = updateService;
 exports.deleteService = deleteService;
+exports.createServiceInformations = createServiceInformations;
 const index_1 = require("../database/index");
 // CREATE
 async function createService(data, file) {
@@ -20,10 +21,12 @@ async function createService(data, file) {
 async function getAllServices() {
     const result = await index_1.pool.query(`
     SELECT
+      s.id,
       s.id AS service_id,
       s.type,
       s.title,
       s.subtitle,
+      s.valor,
       s.valor AS price,
       s.time_minutes AS time,
       s.description AS service_description,
@@ -92,5 +95,18 @@ async function updateService(id, data, file) {
 async function deleteService(id) {
     const result = await index_1.pool.query(`DELETE FROM services WHERE id = $1 RETURNING *`, [id]);
     return result.rows[0] || null;
+}
+// CREATE SERVICE INFORMATIONS
+async function createServiceInformations(serviceId, informations) {
+    // Primeiro, remove as informações antigas
+    await index_1.pool.query(`DELETE FROM service_informations WHERE service_id = $1`, [serviceId]);
+    // Depois, insere as novas informações
+    const insertPromises = informations.map((description) => {
+        return index_1.pool.query(`INSERT INTO service_informations (service_id, description, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW())
+       RETURNING *`, [serviceId, description]);
+    });
+    const results = await Promise.all(insertPromises);
+    return results.map((result) => result.rows[0]);
 }
 //# sourceMappingURL=servicesService.js.map

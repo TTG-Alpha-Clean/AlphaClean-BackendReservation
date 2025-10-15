@@ -15,5 +15,6 @@ router.get('/:id', auth_1.requireUser, auth_1.requireAdmin, servicesController_1
 router.post('/', auth_1.requireUser, auth_1.requireAdmin, upload_1.default.single("image"), servicesController_1.addService);
 router.put('/:id', auth_1.requireUser, auth_1.requireAdmin, upload_1.default.single("image"), servicesController_1.editService);
 router.delete('/:id', auth_1.requireUser, auth_1.requireAdmin, servicesController_1.removeService);
+router.post('/:id/informations', auth_1.requireUser, auth_1.requireAdmin, servicesController_1.addServiceInformations);
 exports.default = router;
 //# sourceMappingURL=servicesRoutes.js.map

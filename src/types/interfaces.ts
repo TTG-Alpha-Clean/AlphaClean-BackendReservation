@@ -25,7 +25,6 @@ export interface User {
     nome: string;
     email: string;
     role: 'user' | 'admin';
-    active: boolean;
     created_at: Date;
     updated_at: Date;
 }
@@ -58,7 +57,6 @@ export interface PaginationResult<T> {
 export interface ListUsersParams {
     page?: number;
     page_size?: number;
-    active?: boolean;
     role?: string;
 }
 
@@ -107,7 +105,7 @@ export interface LoginData {
 // Interface para resposta de login
 export interface LoginResponse {
     token: string;
-    user: Pick<User, 'id' | 'nome' | 'email' | 'role' | 'active'>;
+    user: Pick<User, 'id' | 'nome' | 'email' | 'role'>;
 }
 
 // Tipos para status de agendamento

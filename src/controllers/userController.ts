@@ -11,12 +11,11 @@ export const me = authenticatedHandler(async (req: AuthenticatedRequest, res: Re
 });
 
 export const list = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const { page = "1", page_size = "20", active, role } = req.query;
+    const { page = "1", page_size = "20", role } = req.query;
 
     const result = await userSvc.list({
         page: Number(page),
         page_size: Math.min(Number(page_size), 100),
-        active: active === undefined ? undefined : (active === "true"),
         role: (role as string) || undefined
     });
 

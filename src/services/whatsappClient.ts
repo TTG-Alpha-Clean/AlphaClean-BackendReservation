@@ -13,6 +13,36 @@ class WhatsAppClient {
     return !!process.env.WHATSAPP_SERVICE_URL || process.env.NODE_ENV === 'development';
   }
 
+  private formatPhoneNumber(phone: string): string {
+    // Remove todos os caracteres não numéricos
+    let cleanPhone = phone.replace(/\D/g, '');
+
+    console.log(`📞 Formatando número: "${phone}" -> "${cleanPhone}"`);
+
+    // Se não começar com 55 (Brasil), adiciona
+    if (!cleanPhone.startsWith('55')) {
+      cleanPhone = '55' + cleanPhone;
+      console.log(`🇧🇷 Adicionado código do Brasil: "${cleanPhone}"`);
+    }
+
+    // Corrigir formato brasileiro: remover o 9 extra se for celular brasileiro
+    if (cleanPhone.startsWith('55') && cleanPhone.length === 13) {
+      // Números brasileiros com 13 dígitos (55 + 2 DDD + 9 + 8 números)
+      const ddd = cleanPhone.substring(2, 4);
+      const ninthDigit = cleanPhone.substring(4, 5);
+      const phoneNumber = cleanPhone.substring(5);
+
+      // Se o 5º dígito é 9 (nono dígito), remover para compatibilidade WhatsApp
+      if (ninthDigit === '9' && phoneNumber.length === 8) {
+        cleanPhone = '55' + ddd + phoneNumber;
+        console.log(`📱 Removido 9º dígito brasileiro: "${cleanPhone}"`);
+      }
+    }
+
+    console.log(`✅ Número final formatado: "${cleanPhone}"`);
+    return cleanPhone;
+  }
+
   async sendServiceCompletedNotification(
     clientName: string,
     clientPhone: string,
@@ -29,6 +59,9 @@ class WhatsAppClient {
     try {
       console.log('📤 Enviando notificação de conclusão via WhatsApp Service...');
 
+      // Formatar número de telefone (remover 9 extra)
+      const formattedPhone = this.formatPhoneNumber(clientPhone);
+
       const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/send-completion`, {
         method: 'POST',
         headers: {
@@ -36,7 +69,7 @@ class WhatsAppClient {
         },
         body: JSON.stringify({
           clientName,
-          clientPhone,
+          clientPhone: formattedPhone,
           serviceName,
           vehicleModel,
           licensePlate
@@ -75,6 +108,9 @@ class WhatsAppClient {
     try {
       console.log('📤 Enviando lembrete via WhatsApp Service...');
 
+      // Formatar número de telefone (remover 9 extra)
+      const formattedPhone = this.formatPhoneNumber(clientPhone);
+
       const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/send-reminder`, {
         method: 'POST',
         headers: {
@@ -82,7 +118,7 @@ class WhatsAppClient {
         },
         body: JSON.stringify({
           clientName,
-          clientPhone,
+          clientPhone: formattedPhone,
           serviceName,
           date,
           time

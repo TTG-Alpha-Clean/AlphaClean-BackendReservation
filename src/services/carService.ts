@@ -13,7 +13,6 @@ export interface Car {
     marca?: string | null;
     observacoes?: string | null;
     is_default: boolean;
-    ativo: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -36,13 +35,11 @@ export interface UpdateCarPayload {
     marca?: string | null;
     observacoes?: string | null;
     is_default?: boolean;
-    ativo?: boolean;
 }
 
 export interface ListCarsFilters {
     page?: number;
     page_size?: number;
-    ativo?: boolean;
     marca?: string;
 }
 
@@ -50,18 +47,12 @@ export async function listUserCars(usuario_id: string, filters: ListCarsFilters 
     const {
         page = 1,
         page_size = 20,
-        ativo = true,
         marca
     } = filters;
 
     const where: string[] = ['usuario_id = $1'];
     const params: any[] = [usuario_id];
     let i = 2;
-
-    if (ativo !== undefined) {
-        where.push(`ativo = $${i++}`);
-        params.push(ativo);
-    }
 
     if (marca) {
         where.push(`LOWER(marca) LIKE LOWER($${i++})`);
@@ -139,7 +130,7 @@ export async function createCar(usuario_id: string, payload: CreateCarPayload): 
 
     // Verificar se a placa já existe para este usuário
     const existingCar = await pool.query(
-        'SELECT id FROM cars WHERE placa = $1 AND usuario_id = $2 AND ativo = true',
+        'SELECT id FROM cars WHERE placa = $1 AND usuario_id = $2',
         [sanitizedPlate, usuario_id]
     );
 
@@ -150,9 +141,9 @@ export async function createCar(usuario_id: string, payload: CreateCarPayload): 
     const query = `
         INSERT INTO cars (
             usuario_id, modelo_veiculo, cor, placa, ano, marca,
-            observacoes, is_default, ativo
+            observacoes, is_default
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
     `;
 
@@ -178,8 +169,7 @@ export async function updateCar(id: string, usuario_id: string, payload: UpdateC
         ano,
         marca,
         observacoes,
-        is_default,
-        ativo
+        is_default
     } = payload;
 
     // Se a placa foi alterada, verificar se não existe outro carro com a mesma placa
@@ -190,7 +180,7 @@ export async function updateCar(id: string, usuario_id: string, payload: UpdateC
         }
 
         const existingPlate = await pool.query(
-            'SELECT id FROM cars WHERE placa = $1 AND usuario_id = $2 AND id != $3 AND ativo = true',
+            'SELECT id FROM cars WHERE placa = $1 AND usuario_id = $2 AND id != $3',
             [sanitizedPlate, usuario_id, id]
         );
 
@@ -231,10 +221,6 @@ export async function updateCar(id: string, usuario_id: string, payload: UpdateC
     if (is_default !== undefined) {
         updates.push(`is_default = $${i++}`);
         params.push(is_default);
-    }
-    if (ativo !== undefined) {
-        updates.push(`ativo = $${i++}`);
-        params.push(ativo);
     }
 
     if (updates.length === 0) {
@@ -280,9 +266,9 @@ export async function deleteCar(id: string, usuario_id: string): Promise<void> {
         throw new ApiError(400, "Não é possível excluir um carro que possui agendamentos ativos");
     }
 
-    // Soft delete - marcar como inativo
+    // Hard delete - remover permanentemente
     await pool.query(
-        'UPDATE cars SET ativo = false, updated_at = NOW() WHERE id = $1 AND usuario_id = $2',
+        'DELETE FROM cars WHERE id = $1 AND usuario_id = $2',
         [id, usuario_id]
     );
 }
@@ -292,10 +278,6 @@ export async function setDefaultCar(id: string, usuario_id: string): Promise<Car
     const car = await getCarById(id, usuario_id);
     if (!car) {
         throw new ApiError(404, "Carro não encontrado");
-    }
-
-    if (!car.ativo) {
-        throw new ApiError(400, "Não é possível definir um carro inativo como padrão");
     }
 
     // O trigger já vai garantir que apenas este seja o padrão
@@ -309,7 +291,7 @@ export async function setDefaultCar(id: string, usuario_id: string): Promise<Car
 
 export async function getDefaultCar(usuario_id: string): Promise<Car | null> {
     const { rows } = await pool.query(
-        'SELECT * FROM cars WHERE usuario_id = $1 AND is_default = true AND ativo = true LIMIT 1',
+        'SELECT * FROM cars WHERE usuario_id = $1 AND is_default = true LIMIT 1',
         [usuario_id]
     );
     return rows[0] || null;

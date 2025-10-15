@@ -73,8 +73,8 @@ export const me = asyncHandler(async (req: Request, res: Response): Promise<void
         const payload = verifyJWT(token, { secret: process.env.JWT_SECRET || "dev" });
         const user = await userSvc.getById(payload.sub);
 
-        if (!user || !user.active) {
-            res.status(401).json({ error: "Usuário inativo" });
+        if (!user) {
+            res.status(401).json({ error: "Usuário não encontrado" });
             return;
         }
 
@@ -83,8 +83,7 @@ export const me = asyncHandler(async (req: Request, res: Response): Promise<void
                 id: user.id,
                 nome: user.nome,
                 email: user.email,
-                role: user.role,
-                active: user.active
+                role: user.role
             }
         });
     } catch (error) {

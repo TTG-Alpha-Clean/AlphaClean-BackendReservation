@@ -214,23 +214,23 @@ export async function list(filters: ListFilters) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            s.nome as servico_nome,
+            s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
-        LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
         `
         : `
-        SELECT 
+        SELECT
             a.*,
-            s.nome as servico_nome,
+            s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
-        LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
@@ -276,21 +276,21 @@ export async function getByIdWithClientInfo(id: string, user: AuthUser): Promise
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            s.nome as servico_nome,
+            s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
-        LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         WHERE a.id = $1
         `
         : `
-        SELECT 
+        SELECT
             a.*,
-            s.nome as servico_nome,
+            s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
-        LEFT JOIN servicos s ON a.servico_id = s.id
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         WHERE a.id = $1 AND a.usuario_id = $2
         `;
 
@@ -362,13 +362,13 @@ export async function create(payload: CreateAgendamentoPayload) {
         throw new ApiError(409, "Horário esgotado");
     }
 
-    // Verificar se o serviço existe
-    const { rows: servicoRows } = await pool.query(
-        'SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true',
+    // Verificar se o serviço existe na tabela services
+    const servicoRows = await pool.query(
+        'SELECT id, title as nome, valor FROM services WHERE id = $1 AND deleted_at IS NULL',
         [servico_id]
     );
 
-    if (!servicoRows[0]) {
+    if (!servicoRows.rows[0]) {
         throw new ApiError(400, "Serviço não encontrado ou inativo");
     }
 

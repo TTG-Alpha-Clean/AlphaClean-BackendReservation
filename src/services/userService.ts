@@ -10,21 +10,17 @@ export async function findByEmail(email: string): Promise<any> {
 }
 
 export async function getById(id: string): Promise<any> {
-    const { rows } = await pool.query(`select id, nome, email, active, role, created_at, updated_at from usuarios where id=$1`, [id]);
+    const { rows } = await pool.query(`select id, nome, email, role, created_at, updated_at from usuarios where id=$1`, [id]);
     return rows[0] || null;
 }
 
-export async function list({ page = 1, page_size = 20, active, role }: any): Promise<any> {
+export async function list({ page = 1, page_size = 20, role }: any): Promise<any> {
     const where: string[] = [];
     const params: any[] = [];
     let i = 1;
 
-    if (active !== undefined) {
-        where.push(`active = ${i++}`);
-        params.push(!!active);
-    }
     if (role) {
-        where.push(`role = ${i++}::user_role`);
+        where.push(`role = $${i++}`);
         params.push(role);
     }
 
@@ -33,7 +29,7 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
 
     // Query simplificada - buscar apenas usuários primeiro
     const q = `
-    select id, nome, email, active, role, created_at, updated_at
+    select id, nome, email, role, created_at, updated_at
     from usuarios
     ${whereSQL}
     order by created_at desc
@@ -44,15 +40,15 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
 
     // Buscar telefones e carros separadamente para cada usuário
     const formattedData = await Promise.all(rows.map(async (user: any) => {
-        // Buscar telefones (ddd + numero em formato E.164)
+        // Buscar telefones (ddd + numero)
         const { rows: phones } = await pool.query(
-            'select ddd, numero, e164 from telefones where usuario_id = $1 limit 1',
+            'select ddd, numero from telefones where usuario_id = $1 limit 1',
             [user.id]
         );
 
         // Buscar carros
         const { rows: cars } = await pool.query(
-            'select id, marca, modelo_veiculo as modelo, ano, placa from cars where usuario_id = $1 and ativo = true',
+            'select id, marca, modelo_veiculo as modelo, ano, placa from cars where usuario_id = $1',
             [user.id]
         );
 
@@ -60,8 +56,7 @@ export async function list({ page = 1, page_size = 20, active, role }: any): Pro
             _id: user.id,
             name: user.nome,
             email: user.email,
-            phone: phones.length > 0 ? (phones[0].e164 || `+55${phones[0].ddd}${phones[0].numero}`) : '',
-            active: user.active,
+            phone: phones.length > 0 ? `+55${phones[0].ddd}${phones[0].numero}` : '',
             role: user.role,
             createdAt: user.created_at,
             cars: cars.map((car: any) => ({
@@ -86,8 +81,8 @@ export async function createUser({ nome, email, senha, role = "user", telefones 
     try {
         const { rows } = await pool.query(
             `insert into usuarios (nome, email, senha, role)
-       values ($1,$2,$3,$4::user_role)
-       returning id, nome, email, active, role, created_at, updated_at`,
+       values ($1,$2,$3,$4)
+       returning id, nome, email, role, created_at, updated_at`,
             [nome, email, hashed, role]
         );
 
@@ -106,6 +101,7 @@ export async function createUser({ nome, email, senha, role = "user", telefones 
 
         return user;
     } catch (err: any) {
+        console.error("❌ Erro ao criar usuário:", err);
         if (err.code === "23505") throw new ApiError(409, "Email já cadastrado");
         throw new ApiError(500, "Erro ao criar usuário", err);
     }
@@ -115,26 +111,24 @@ export async function addPhone({ usuario_id, ddd, numero, is_whatsapp = false }:
     const { rows } = await pool.query(
         `insert into telefones (usuario_id, ddd, numero, is_whatsapp)
      values ($1,$2,$3,$4)
-     returning id, ddd, numero, is_whatsapp, e164, created_at`,
+     returning id, ddd, numero, is_whatsapp, created_at`,
         [usuario_id, ddd, numero, is_whatsapp]
     );
     return rows[0];
 }
 
 export async function setActive(id: string, active: boolean): Promise<any> {
-    const { rows } = await pool.query(
-        `update usuarios set active=$1, updated_at=now() where id=$2
-     returning id, nome, email, active, role, created_at, updated_at`,
-        [!!active, id]
-    );
-    if (!rows[0]) throw new ApiError(404, "Usuário não encontrado");
-    return rows[0];
+    // Nota: Coluna 'active' removida do schema - esta função está deprecated
+    // Mantida por compatibilidade mas não faz nada
+    const user = await getById(id);
+    if (!user) throw new ApiError(404, "Usuário não encontrado");
+    return user;
 }
 
 export async function updateRole(id: string, role: string): Promise<any> {
     const { rows } = await pool.query(
-        `update usuarios set role=$1::user_role, updated_at=now() where id=$2
-     returning id, nome, email, active, role, created_at, updated_at`,
+        `update usuarios set role=$1, updated_at=now() where id=$2
+     returning id, nome, email, role, created_at, updated_at`,
         [role, id]
     );
     if (!rows[0]) throw new ApiError(404, "Usuário não encontrado");
@@ -143,7 +137,7 @@ export async function updateRole(id: string, role: string): Promise<any> {
 
 export async function login({ email, senha }: any): Promise<any> {
     const user = await findByEmail(email);
-    if (!user || !user.active) throw new ApiError(401, "Credenciais inválidas");
+    if (!user) throw new ApiError(401, "Credenciais inválidas");
 
     // Suporte para ambos os formatos de hash: scrypt e bcrypt
     let ok = false;
@@ -162,14 +156,13 @@ export async function login({ email, senha }: any): Promise<any> {
         id: user.id,
         nome: user.nome,
         email: user.email,
-        role: user.role,
-        active: user.active
+        role: user.role
     };
 }
 
 export async function hasAnyAdmin(): Promise<boolean> {
     const { rows } = await pool.query(
-        `select exists (select 1 from usuarios where role = 'admin' and active = true) as has;`
+        `select exists (select 1 from usuarios where role = 'admin') as has;`
     );
     return !!rows[0]?.has;
 }

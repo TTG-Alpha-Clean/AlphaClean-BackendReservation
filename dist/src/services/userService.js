@@ -39,6 +39,7 @@ async function list({ page = 1, page_size = 20, active, role }) {
     }
     const whereSQL = where.length ? `where ${where.join(" and ")}` : "";
     const offset = (page - 1) * page_size;
+    // Query simplificada - buscar apenas usuários primeiro
     const q = `
     select id, nome, email, active, role, created_at, updated_at
     from usuarios
@@ -47,7 +48,30 @@ async function list({ page = 1, page_size = 20, active, role }) {
     limit ${page_size} offset ${offset}`;
     const { rows } = await index_1.pool.query(q, params);
     const { rows: [{ count }] } = await index_1.pool.query(`select count(*)::int as count from usuarios ${whereSQL}`, params);
-    return { data: rows, page, page_size, total: count };
+    // Buscar telefones e carros separadamente para cada usuário
+    const formattedData = await Promise.all(rows.map(async (user) => {
+        // Buscar telefones (ddd + numero em formato E.164)
+        const { rows: phones } = await index_1.pool.query('select ddd, numero, e164 from telefones where usuario_id = $1 limit 1', [user.id]);
+        // Buscar carros
+        const { rows: cars } = await index_1.pool.query('select id, marca, modelo_veiculo as modelo, ano, placa from cars where usuario_id = $1 and ativo = true', [user.id]);
+        return {
+            _id: user.id,
+            name: user.nome,
+            email: user.email,
+            phone: phones.length > 0 ? (phones[0].e164 || `+55${phones[0].ddd}${phones[0].numero}`) : '',
+            active: user.active,
+            role: user.role,
+            createdAt: user.created_at,
+            cars: cars.map((car) => ({
+                _id: car.id,
+                brand: car.marca || '',
+                model: car.modelo,
+                year: car.ano || '',
+                licensePlate: car.placa
+            }))
+        };
+    }));
+    return { data: formattedData, page, page_size, total: count };
 }
 async function createUser({ nome, email, senha, role = "user", telefones = [] }) {
     const exists = await findByEmail(email);
