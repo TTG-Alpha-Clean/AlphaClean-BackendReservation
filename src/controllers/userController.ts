@@ -42,3 +42,32 @@ export const setRole = authenticatedHandler(async (req: AuthenticatedRequest, re
     const u = await userSvc.updateRole(req.params.id, role);
     res.json(u);
 });
+
+export const updateProfile = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { telefone } = req.body;
+
+    if (!telefone || typeof telefone !== 'string') {
+        res.status(400).json({ error: 'Telefone é obrigatório' });
+        return;
+    }
+
+    const updatedUser = await userSvc.updateProfile(req.user!.id, { telefone });
+    res.json({ user: updatedUser });
+});
+
+export const updatePassword = authenticatedHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias' });
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres' });
+        return;
+    }
+
+    await userSvc.updatePassword(req.user!.id, currentPassword, newPassword);
+    res.json({ message: 'Senha atualizada com sucesso' });
+});

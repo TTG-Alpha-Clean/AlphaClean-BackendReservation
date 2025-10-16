@@ -166,3 +166,72 @@ export async function hasAnyAdmin(): Promise<boolean> {
     );
     return !!rows[0]?.has;
 }
+
+export async function updateProfile(userId: string, data: { telefone: string }): Promise<any> {
+    const user = await getById(userId);
+    if (!user) throw new ApiError(404, "Usuário não encontrado");
+
+    // Atualizar/criar telefone
+    const { rows: existingPhone } = await pool.query(
+        'select id from telefones where usuario_id = $1 limit 1',
+        [userId]
+    );
+
+    if (existingPhone.length > 0) {
+        // Atualizar telefone existente
+        await pool.query(
+            'update telefones set numero = $1, updated_at = now() where usuario_id = $2',
+            [data.telefone, userId]
+        );
+    } else {
+        // Criar novo telefone
+        await pool.query(
+            'insert into telefones (usuario_id, ddd, numero, is_whatsapp) values ($1, $2, $3, $4)',
+            [userId, '', data.telefone, true]
+        );
+    }
+
+    // Retornar usuário atualizado com telefone
+    const { rows: phones } = await pool.query(
+        'select ddd, numero from telefones where usuario_id = $1 limit 1',
+        [userId]
+    );
+
+    return {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        telefone: phones.length > 0 ? phones[0].numero : '',
+        role: user.role,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+    };
+}
+
+export async function updatePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const { rows } = await pool.query('select senha from usuarios where id = $1', [userId]);
+
+    if (!rows[0]) throw new ApiError(404, "Usuário não encontrado");
+
+    const user = rows[0];
+
+    // Verificar senha atual
+    let ok = false;
+    if (user.senha.startsWith('$2b$')) {
+        // Hash bcrypt
+        ok = await bcrypt.compare(currentPassword, user.senha);
+    } else if (user.senha.startsWith('scrypt$')) {
+        // Hash scrypt
+        ok = await verifyPassword(currentPassword, user.senha);
+    }
+
+    if (!ok) throw new ApiError(401, "Senha atual incorreta");
+
+    // Atualizar para nova senha usando bcrypt
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+        'update usuarios set senha = $1, updated_at = now() where id = $2',
+        [hashedNewPassword, userId]
+    );
+}

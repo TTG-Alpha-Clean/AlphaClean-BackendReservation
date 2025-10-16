@@ -6,6 +6,8 @@ import { requireUser, requireAdmin } from "../middlewares/auth";
 const router = Router();
 
 router.get("/me", requireUser, users.me);
+router.patch("/profile", requireUser, users.updateProfile);
+router.patch("/password", requireUser, users.updatePassword);
 router.get("/", requireUser, requireAdmin, users.list);
 router.get("/:id", requireUser, requireAdmin, users.getById);
 router.patch("/:id/active", requireUser, requireAdmin, users.setActive);
