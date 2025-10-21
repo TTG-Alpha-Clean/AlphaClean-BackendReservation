@@ -113,15 +113,27 @@ export const completeService = authenticatedHandler(async (req: AuthenticatedReq
 
     // Se deve enviar WhatsApp, fazer de forma assíncrona (não bloqueante)
     if (sendWhatsApp && status === 'finalizado') {
+        console.log("🔔 Tentando enviar notificação WhatsApp - sendWhatsApp:", sendWhatsApp);
         // Executar em background sem bloquear a resposta
         (async () => {
             try {
+                console.log("📋 Buscando dados completos do agendamento ID:", req.params.id);
                 // Buscar dados completos do agendamento com informações do cliente
                 const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
 
+                console.log("📊 Dados do agendamento:", {
+                    nome: agendamentoCompleto?.usuario_nome,
+                    telefone: agendamentoCompleto?.usuario_telefone,
+                    servico: agendamentoCompleto?.servico_nome,
+                    veiculo: agendamentoCompleto?.modelo_veiculo,
+                    placa: agendamentoCompleto?.placa
+                });
+
                 if (agendamentoCompleto?.usuario_telefone) {
+                    console.log("📞 Telefone encontrado, importando whatsappClient...");
                     const whatsappClient = require('../services/whatsappClient').default;
 
+                    console.log("📤 Chamando sendServiceCompletedNotification...");
                     const enviado = await whatsappClient.sendServiceCompletedNotification(
                         agendamentoCompleto.usuario_nome || 'Cliente',
                         agendamentoCompleto.usuario_telefone,
@@ -136,9 +148,12 @@ export const completeService = authenticatedHandler(async (req: AuthenticatedReq
                 }
             } catch (whatsappError) {
                 console.error("❌ Erro ao enviar WhatsApp (assíncrono):", whatsappError);
+                console.error("❌ Stack trace:", (whatsappError as Error).stack);
                 // Não falhar a operação, apenas logar o erro
             }
         })();
+    } else {
+        console.log("ℹ️ Notificação WhatsApp não será enviada - sendWhatsApp:", sendWhatsApp, "status:", status);
     }
 });
 

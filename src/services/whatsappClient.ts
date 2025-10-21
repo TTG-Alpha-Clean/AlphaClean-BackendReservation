@@ -58,11 +58,23 @@ class WhatsAppClient {
 
     try {
       console.log('📤 Enviando notificação de conclusão via WhatsApp Service...');
+      console.log('🌐 URL do serviço:', this.whatsappServiceUrl);
+      console.log('📋 Dados da notificação:', {
+        clientName,
+        clientPhone,
+        serviceName,
+        vehicleModel,
+        licensePlate
+      });
 
       // Formatar número de telefone (remover 9 extra)
       const formattedPhone = this.formatPhoneNumber(clientPhone);
+      console.log('📱 Telefone formatado:', formattedPhone);
 
-      const response = await fetch(`${this.whatsappServiceUrl}/whatsapp/send-completion`, {
+      const url = `${this.whatsappServiceUrl}/whatsapp/send-completion`;
+      console.log('🔗 Fazendo requisição para:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,6 +88,8 @@ class WhatsAppClient {
         })
       });
 
+      console.log('📡 Status da resposta:', response.status, response.statusText);
+
       if (!response.ok) {
         const error = await response.text();
         console.error('❌ Erro na resposta do WhatsApp Service:', error);
@@ -88,6 +102,8 @@ class WhatsAppClient {
       return (result as { success?: boolean }).success || false;
     } catch (error) {
       console.error('❌ Erro ao comunicar com WhatsApp Service:', error);
+      console.error('❌ Detalhes do erro:', (error as Error).message);
+      console.error('❌ Stack:', (error as Error).stack);
       return false;
     }
   }
