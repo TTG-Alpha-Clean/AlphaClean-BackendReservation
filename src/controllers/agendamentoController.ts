@@ -100,58 +100,46 @@ export const completeService = authenticatedHandler(async (req: AuthenticatedReq
 
     const { status = 'finalizado', notes, sendWhatsApp = false } = req.body;
 
-    // Atualizar status do agendamento
+    // Atualizar status do agendamento IMEDIATAMENTE
     const updated = await agendamentoService.updateStatus(req.params.id, req.user!, status);
 
-    // Se deve enviar WhatsApp, buscar dados completos e enviar notificação
+    console.log("🔍 COMPLETE - Serviço finalizado:", updated);
+
+    // Retornar resposta imediatamente ao frontend
+    res.json({
+        ...updated,
+        message: "Serviço finalizado com sucesso!"
+    });
+
+    // Se deve enviar WhatsApp, fazer de forma assíncrona (não bloqueante)
     if (sendWhatsApp && status === 'finalizado') {
-        try {
-            // Buscar dados completos do agendamento com informações do cliente
-            const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
+        // Executar em background sem bloquear a resposta
+        (async () => {
+            try {
+                // Buscar dados completos do agendamento com informações do cliente
+                const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user!);
 
-            if (agendamentoCompleto?.usuario_telefone) {
-                const whatsappClient = require('../services/whatsappClient').default;
+                if (agendamentoCompleto?.usuario_telefone) {
+                    const whatsappClient = require('../services/whatsappClient').default;
 
-                const enviado = await whatsappClient.sendServiceCompletedNotification(
-                    agendamentoCompleto.usuario_nome || 'Cliente',
-                    agendamentoCompleto.usuario_telefone,
-                    agendamentoCompleto.servico_nome || 'Serviço',
-                    agendamentoCompleto.modelo_veiculo,
-                    agendamentoCompleto.placa
-                );
+                    const enviado = await whatsappClient.sendServiceCompletedNotification(
+                        agendamentoCompleto.usuario_nome || 'Cliente',
+                        agendamentoCompleto.usuario_telefone,
+                        agendamentoCompleto.servico_nome || 'Serviço',
+                        agendamentoCompleto.modelo_veiculo,
+                        agendamentoCompleto.placa
+                    );
 
-                console.log("📱 WhatsApp enviado:", enviado);
-
-                res.json({
-                    ...updated,
-                    whatsappSent: enviado,
-                    message: enviado
-                        ? "Serviço finalizado e notificação WhatsApp enviada com sucesso!"
-                        : "Serviço finalizado, mas houve falha no envio do WhatsApp"
-                });
-                return;
-            } else {
-                console.log("⚠️ Cliente não possui telefone cadastrado");
-                res.json({
-                    ...updated,
-                    whatsappSent: false,
-                    message: "Serviço finalizado. Cliente não possui telefone cadastrado para WhatsApp."
-                });
-                return;
+                    console.log("📱 WhatsApp enviado (assíncrono):", enviado);
+                } else {
+                    console.log("⚠️ Cliente não possui telefone cadastrado");
+                }
+            } catch (whatsappError) {
+                console.error("❌ Erro ao enviar WhatsApp (assíncrono):", whatsappError);
+                // Não falhar a operação, apenas logar o erro
             }
-        } catch (whatsappError) {
-            console.error("❌ Erro ao enviar WhatsApp:", whatsappError);
-            res.json({
-                ...updated,
-                whatsappSent: false,
-                message: "Serviço finalizado, mas houve erro no envio do WhatsApp"
-            });
-            return;
-        }
+        })();
     }
-
-    console.log("🔍 COMPLETE - Resultado:", updated);
-    res.json(updated);
 });
 
 export const deleteAgendamento = authenticatedHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
