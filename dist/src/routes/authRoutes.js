@@ -36,10 +36,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // src/routes/authRoutes.ts
 const express_1 = require("express");
 const auth = __importStar(require("../controllers/authController"));
+const passwordReset = __importStar(require("../controllers/passwordResetController"));
 const router = (0, express_1.Router)();
+// Autenticação
 router.post("/register", auth.register);
 router.post("/login", auth.login);
 router.get("/me", auth.me);
 router.post("/logout", auth.logout);
+// Recuperação de senha
+router.post("/forgot-password", passwordReset.forgotPassword);
+router.post("/reset-password", passwordReset.resetPassword);
+router.get("/verify-reset-token/:token", passwordReset.verifyResetToken);
 exports.default = router;
 //# sourceMappingURL=authRoutes.js.map

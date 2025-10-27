@@ -22,8 +22,7 @@ async function adminLogin(req, res) {
             id: result.admin.id,
             nome: result.admin.nome,
             email: result.admin.email,
-            role: 'admin',
-            active: true
+            role: 'admin'
         }
     });
 }

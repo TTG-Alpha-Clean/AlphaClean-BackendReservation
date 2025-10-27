@@ -90,8 +90,8 @@ exports.me = asyncHandler(async (req, res) => {
     try {
         const payload = (0, jwt_1.verifyJWT)(token, { secret: process.env.JWT_SECRET || "dev" });
         const user = await userSvc.getById(payload.sub);
-        if (!user || !user.active) {
-            res.status(401).json({ error: "Usuário inativo" });
+        if (!user) {
+            res.status(401).json({ error: "Usuário não encontrado" });
             return;
         }
         res.json({
@@ -99,8 +99,7 @@ exports.me = asyncHandler(async (req, res) => {
                 id: user.id,
                 nome: user.nome,
                 email: user.email,
-                role: user.role,
-                active: user.active
+                role: user.role
             }
         });
     }

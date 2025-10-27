@@ -148,12 +148,11 @@ async function list(filters) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            COALESCE(serv.title, s.nome) as servico_nome,
-            COALESCE(serv.valor, s.valor) as servico_valor
+            s.title as servico_nome,
+            s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
-        LEFT JOIN servicos s ON a.servico_id = s.id
-        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
@@ -162,11 +161,10 @@ async function list(filters) {
         : `
         SELECT
             a.*,
-            COALESCE(serv.title, s.nome) as servico_nome,
-            COALESCE(serv.valor, s.valor) as servico_valor
+            s.title as servico_nome,
+            s.valor as servico_valor
         FROM agendamentos a
-        LEFT JOIN servicos s ON a.servico_id = s.id
-        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         ${whereSQL}
         ORDER BY a.data DESC, a.horario DESC
         LIMIT $${i++} OFFSET $${i++}
@@ -205,23 +203,21 @@ async function getByIdWithClientInfo(id, user) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
-            COALESCE(serv.title, s.nome) as servico_nome,
-            COALESCE(serv.valor, s.valor) as servico_valor
+            s.title as servico_nome,
+            s.valor as servico_valor
         FROM agendamentos a
         LEFT JOIN usuarios u ON a.usuario_id = u.id
-        LEFT JOIN servicos s ON a.servico_id = s.id
-        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         LEFT JOIN telefones t ON u.id = t.usuario_id AND t.is_whatsapp = true
         WHERE a.id = $1
         `
         : `
         SELECT
             a.*,
-            COALESCE(serv.title, s.nome) as servico_nome,
-            COALESCE(serv.valor, s.valor) as servico_valor
+            s.title as servico_nome,
+            s.valor as servico_valor
         FROM agendamentos a
-        LEFT JOIN servicos s ON a.servico_id = s.id
-        LEFT JOIN services serv ON a.servico_id::text = serv.id::text AND serv.deleted_at IS NULL
+        LEFT JOIN services s ON a.servico_id = s.id AND s.deleted_at IS NULL
         WHERE a.id = $1 AND a.usuario_id = $2
         `;
     const params = isAdmin ? [id] : [id, user.id];
@@ -270,12 +266,8 @@ async function create(payload) {
     if (used >= SCHEDULE.MAX_CONCURRENT) {
         throw new apiError_1.default(409, "Horário esgotado");
     }
-    // Verificar se o serviço existe (tenta primeiro na tabela services, depois em servicos)
-    let servicoRows = await index_1.pool.query('SELECT id, title as nome, valor FROM services WHERE id = $1 AND deleted_at IS NULL', [servico_id]);
-    // Se não encontrou em services, tenta em servicos (backward compatibility)
-    if (!servicoRows.rows[0]) {
-        servicoRows = await index_1.pool.query('SELECT id, nome, valor FROM servicos WHERE id = $1 AND ativo = true', [servico_id]);
-    }
+    // Verificar se o serviço existe na tabela services
+    const servicoRows = await index_1.pool.query('SELECT id, title as nome, valor FROM services WHERE id = $1 AND deleted_at IS NULL', [servico_id]);
     if (!servicoRows.rows[0]) {
         throw new apiError_1.default(400, "Serviço não encontrado ou inativo");
     }

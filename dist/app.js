@@ -33,6 +33,7 @@ const servicesRoutes_1 = __importDefault(require("./src/routes/servicesRoutes"))
 const adminRoutes_1 = __importDefault(require("./src/routes/adminRoutes"));
 const whatsapp_1 = __importDefault(require("./src/routes/whatsapp"));
 const carRoutes_1 = __importDefault(require("./src/routes/carRoutes"));
+const reports_1 = __importDefault(require("./src/routes/reports"));
 // services (WhatsApp será carregado dinamicamente)
 // middlewares
 const notFound_1 = __importDefault(require("./src/middlewares/notFound"));
@@ -187,6 +188,7 @@ app.use("/api/servicos", servicoRoutes_1.default);
 app.use("/api/services", servicesRoutes_1.default);
 app.use("/api/whatsapp", whatsapp_1.default);
 app.use("/api/cars", carRoutes_1.default);
+app.use("/api/reports", reports_1.default);
 // ===== MIDDLEWARES DE ERRO =====
 app.use(notFound_1.default);
 app.use(errorHandler_1.default);

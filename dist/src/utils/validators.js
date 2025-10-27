@@ -28,15 +28,17 @@ function assertCreatePayload(body) {
     if (!PLATE_RX_MERCOSUL.test(String(body.placa).toUpperCase())) {
         throw new apiError_1.default(400, "placa inválida (formato Mercosul: ABC1D23)");
     }
-    if (!UUID_RX.test(body.servico_id)) {
-        throw new apiError_1.default(400, "servico_id deve ser um UUID válido");
+    // Validar servico_id como INTEGER
+    const servicoId = Number(body.servico_id);
+    if (!Number.isInteger(servicoId) || servicoId <= 0) {
+        throw new apiError_1.default(400, "servico_id deve ser um número inteiro válido");
     }
     return {
         usuario_id: body.usuario_id,
         modelo_veiculo: String(body.modelo_veiculo),
         cor: body.cor ? String(body.cor) : null,
         placa: String(body.placa).toUpperCase(),
-        servico_id: String(body.servico_id),
+        servico_id: String(servicoId),
         data: body.data,
         horario: body.horario,
         observacoes: body.observacoes ? String(body.observacoes) : null,
@@ -55,14 +57,16 @@ function assertUpdatePayload(body) {
     if (!PLATE_RX_MERCOSUL.test(String(body.placa).toUpperCase())) {
         throw new apiError_1.default(400, "placa inválida (formato Mercosul: ABC1D23)");
     }
-    if (!UUID_RX.test(body.servico_id)) {
-        throw new apiError_1.default(400, "servico_id deve ser um UUID válido");
+    // Validar servico_id como INTEGER
+    const servicoId = Number(body.servico_id);
+    if (!Number.isInteger(servicoId) || servicoId <= 0) {
+        throw new apiError_1.default(400, "servico_id deve ser um número inteiro válido");
     }
     return {
         modelo_veiculo: String(body.modelo_veiculo),
         cor: body.cor ? String(body.cor) : null,
         placa: String(body.placa).toUpperCase(),
-        servico_id: String(body.servico_id),
+        servico_id: String(servicoId),
         data: body.data,
         horario: body.horario,
         observacoes: body.observacoes ? String(body.observacoes) : null,

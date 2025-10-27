@@ -2,7 +2,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import pool from '../database/db';
+import { pool } from '../database';
 import { sendPasswordResetEmail } from '../config/email';
 
 /**

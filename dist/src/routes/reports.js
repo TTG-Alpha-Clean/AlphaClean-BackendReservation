@@ -33,17 +33,21 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/routes/userRoutes.ts
+// src/routes/reports.ts
 const express_1 = require("express");
-const users = __importStar(require("../controllers/userController"));
+const reportController = __importStar(require("../controllers/reportController"));
 const auth_1 = require("../middlewares/auth");
 const router = (0, express_1.Router)();
-router.get("/me", auth_1.requireUser, users.me);
-router.patch("/profile", auth_1.requireUser, users.updateProfile);
-router.patch("/password", auth_1.requireUser, users.updatePassword);
-router.get("/", auth_1.requireUser, auth_1.requireAdmin, users.list);
-router.get("/:id", auth_1.requireUser, auth_1.requireAdmin, users.getById);
-router.patch("/:id/active", auth_1.requireUser, auth_1.requireAdmin, users.setActive);
-router.patch("/:id/role", auth_1.requireUser, auth_1.requireAdmin, users.setRole);
+// Todas as rotas de relatórios requerem autenticação e permissão de admin
+router.use(auth_1.requireUser);
+router.use(auth_1.requireAdmin);
+// GET /api/reports/monthly-revenue?year=2025 - Receita mensal do ano
+router.get("/monthly-revenue", reportController.getMonthlyRevenue);
+// GET /api/reports/top-services?year=2025 - Serviços mais rentáveis
+router.get("/top-services", reportController.getTopServices);
+// GET /api/reports/top-clients?year=2025&limit=10 - Clientes mais assíduos
+router.get("/top-clients", reportController.getTopClients);
+// GET /api/reports/stats?year=2025 - Estatísticas gerais
+router.get("/stats", reportController.getGeneralStats);
 exports.default = router;
-//# sourceMappingURL=userRoutes.js.map
+//# sourceMappingURL=reports.js.map

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setRole = exports.setActive = exports.getById = exports.list = exports.me = void 0;
+exports.updatePassword = exports.updateProfile = exports.setRole = exports.setActive = exports.getById = exports.list = exports.me = void 0;
 const asyncHandler_1 = require("../utils/asyncHandler");
 const userSvc = __importStar(require("../services/userService"));
 const userValidators_1 = require("../utils/userValidators");
@@ -42,11 +42,10 @@ exports.me = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     res.json(me);
 });
 exports.list = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
-    const { page = "1", page_size = "20", active, role } = req.query;
+    const { page = "1", page_size = "20", role } = req.query;
     const result = await userSvc.list({
         page: Number(page),
         page_size: Math.min(Number(page_size), 100),
-        active: active === undefined ? undefined : (active === "true"),
         role: role || undefined
     });
     res.json(result);
@@ -68,5 +67,27 @@ exports.setRole = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     (0, userValidators_1.validateRole)(role);
     const u = await userSvc.updateRole(req.params.id, role);
     res.json(u);
+});
+exports.updateProfile = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
+    const { telefone } = req.body;
+    if (!telefone || typeof telefone !== 'string') {
+        res.status(400).json({ error: 'Telefone é obrigatório' });
+        return;
+    }
+    const updatedUser = await userSvc.updateProfile(req.user.id, { telefone });
+    res.json({ user: updatedUser });
+});
+exports.updatePassword = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias' });
+        return;
+    }
+    if (newPassword.length < 6) {
+        res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres' });
+        return;
+    }
+    await userSvc.updatePassword(req.user.id, currentPassword, newPassword);
+    res.json({ message: 'Senha atualizada com sucesso' });
 });
 //# sourceMappingURL=userController.js.map

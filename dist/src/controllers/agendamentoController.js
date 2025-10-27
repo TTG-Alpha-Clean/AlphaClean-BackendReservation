@@ -110,48 +110,64 @@ exports.completeService = (0, asyncHandler_1.authenticatedHandler)(async (req, r
         return;
     }
     const { status = 'finalizado', notes, sendWhatsApp = false } = req.body;
-    // Atualizar status do agendamento
+    // Atualizar status do agendamento IMEDIATAMENTE
     const updated = await agendamentoService.updateStatus(req.params.id, req.user, status);
-    // Se deve enviar WhatsApp, buscar dados completos e enviar notificação
+    console.log("🔍 COMPLETE - Serviço finalizado:", updated);
+    // Se deve enviar WhatsApp, AGUARDAR o envio para retornar status
     if (sendWhatsApp && status === 'finalizado') {
+        console.log("🔔 Tentando enviar notificação WhatsApp - sendWhatsApp:", sendWhatsApp);
         try {
+            console.log("📋 Buscando dados completos do agendamento ID:", req.params.id);
             // Buscar dados completos do agendamento com informações do cliente
             const agendamentoCompleto = await agendamentoService.getByIdWithClientInfo(req.params.id, req.user);
-            if (agendamentoCompleto?.usuario_telefone) {
-                const whatsappClient = require('../services/whatsappClient').default;
-                const enviado = await whatsappClient.sendServiceCompletedNotification(agendamentoCompleto.usuario_nome || 'Cliente', agendamentoCompleto.usuario_telefone, agendamentoCompleto.servico_nome || 'Serviço', agendamentoCompleto.modelo_veiculo, agendamentoCompleto.placa);
-                console.log("📱 WhatsApp enviado:", enviado);
-                res.json({
-                    ...updated,
-                    whatsappSent: enviado,
-                    message: enviado
-                        ? "Serviço finalizado e notificação WhatsApp enviada com sucesso!"
-                        : "Serviço finalizado, mas houve falha no envio do WhatsApp"
-                });
-                return;
-            }
-            else {
+            console.log("📊 Dados do agendamento:", {
+                nome: agendamentoCompleto?.usuario_nome,
+                telefone: agendamentoCompleto?.usuario_telefone,
+                servico: agendamentoCompleto?.servico_nome,
+                veiculo: agendamentoCompleto?.modelo_veiculo,
+                placa: agendamentoCompleto?.placa
+            });
+            if (!agendamentoCompleto?.usuario_telefone) {
                 console.log("⚠️ Cliente não possui telefone cadastrado");
                 res.json({
                     ...updated,
                     whatsappSent: false,
-                    message: "Serviço finalizado. Cliente não possui telefone cadastrado para WhatsApp."
+                    whatsappError: "Cliente não possui telefone cadastrado",
+                    message: "Serviço finalizado, mas cliente não possui telefone para WhatsApp"
                 });
                 return;
             }
+            console.log("📞 Telefone encontrado, importando whatsappClient...");
+            const whatsappClient = require('../services/whatsappClient').default;
+            console.log("📤 Chamando sendServiceCompletedNotification...");
+            const enviado = await whatsappClient.sendServiceCompletedNotification(agendamentoCompleto.usuario_nome || 'Cliente', agendamentoCompleto.usuario_telefone, agendamentoCompleto.servico_nome || 'Serviço', agendamentoCompleto.modelo_veiculo, agendamentoCompleto.placa);
+            console.log("📱 WhatsApp enviado:", enviado);
+            res.json({
+                ...updated,
+                whatsappSent: enviado,
+                message: enviado
+                    ? "Serviço finalizado e notificação WhatsApp enviada!"
+                    : "Serviço finalizado, mas houve erro no envio do WhatsApp"
+            });
         }
         catch (whatsappError) {
             console.error("❌ Erro ao enviar WhatsApp:", whatsappError);
+            console.error("❌ Stack trace:", whatsappError.stack);
             res.json({
                 ...updated,
                 whatsappSent: false,
+                whatsappError: whatsappError.message,
                 message: "Serviço finalizado, mas houve erro no envio do WhatsApp"
             });
-            return;
         }
     }
-    console.log("🔍 COMPLETE - Resultado:", updated);
-    res.json(updated);
+    else {
+        console.log("ℹ️ Notificação WhatsApp não será enviada - sendWhatsApp:", sendWhatsApp, "status:", status);
+        res.json({
+            ...updated,
+            message: "Serviço finalizado com sucesso!"
+        });
+    }
 });
 exports.deleteAgendamento = (0, asyncHandler_1.authenticatedHandler)(async (req, res) => {
     console.log("🔍 DELETE - Controller chamado para ID:", req.params.id);
