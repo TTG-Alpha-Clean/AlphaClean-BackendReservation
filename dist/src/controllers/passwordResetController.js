@@ -13,20 +13,33 @@ const email_1 = require("../config/email");
  * Solicita reset de senha - envia email com token
  */
 const forgotPassword = async (req, res) => {
-    const client = await database_1.pool.connect();
+    let client;
     try {
         const { email } = req.body;
+        console.log('🔵 [ForgotPassword] Iniciando processo para email:', email);
         // Validação
         if (!email) {
+            console.log('❌ [ForgotPassword] Email não fornecido');
             res.status(400).json({ error: 'Email é obrigatório' });
             return;
         }
+        // Verifica variáveis de ambiente
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+            console.error('❌ [ForgotPassword] Variáveis de ambiente EMAIL_USER ou EMAIL_PASSWORD não configuradas');
+            res.status(503).json({
+                error: 'Serviço de email não configurado. Entre em contato com o suporte.'
+            });
+            return;
+        }
+        client = await database_1.pool.connect();
+        console.log('✅ [ForgotPassword] Conexão com banco estabelecida');
         // Busca usuário pelo email
         const userResult = await client.query('SELECT id, nome, email, active FROM usuarios WHERE email = $1', [email.toLowerCase().trim()]);
+        console.log('🔍 [ForgotPassword] Usuário encontrado:', userResult.rows.length > 0);
         // Por segurança, sempre retorna sucesso (mesmo se email não existir)
         // Isso evita que atacantes descubram quais emails estão cadastrados
         if (userResult.rows.length === 0) {
-            console.log(`Tentativa de reset para email não cadastrado: ${email}`);
+            console.log(`⚠️ [ForgotPassword] Email não cadastrado: ${email}`);
             res.status(200).json({
                 message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.',
             });
@@ -35,6 +48,7 @@ const forgotPassword = async (req, res) => {
         const user = userResult.rows[0];
         // Verifica se usuário está ativo
         if (!user.active) {
+            console.log(`⚠️ [ForgotPassword] Usuário inativo: ${email}`);
             res.status(200).json({
                 message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.',
             });
@@ -42,26 +56,49 @@ const forgotPassword = async (req, res) => {
         }
         // Gera token único e seguro
         const token = crypto_1.default.randomBytes(32).toString('hex');
+        console.log('🔑 [ForgotPassword] Token gerado');
         // Token expira em 1 hora
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 1);
         await client.query('BEGIN');
-        // Invalida tokens anteriores do mesmo usuário (opcional, mas recomendado)
-        await client.query('UPDATE password_reset_tokens SET used = TRUE WHERE usuario_id = $1 AND used = FALSE', [user.id]);
-        // Insere novo token
-        await client.query(`INSERT INTO password_reset_tokens (usuario_id, token, expires_at)
-       VALUES ($1, $2, $3)`, [user.id, token, expiresAt]);
+        console.log('📝 [ForgotPassword] Transação iniciada');
+        // Verifica se a tabela existe
+        try {
+            // Invalida tokens anteriores do mesmo usuário
+            await client.query('UPDATE password_reset_tokens SET used = TRUE WHERE usuario_id = $1 AND used = FALSE', [user.id]);
+            // Insere novo token
+            await client.query(`INSERT INTO password_reset_tokens (usuario_id, token, expires_at)
+         VALUES ($1, $2, $3)`, [user.id, token, expiresAt]);
+            console.log('✅ [ForgotPassword] Token salvo no banco');
+        }
+        catch (dbError) {
+            console.error('❌ [ForgotPassword] Erro ao salvar token no banco:', dbError.message);
+            if (dbError.message.includes('does not exist') || dbError.code === '42P01') {
+                await client.query('ROLLBACK');
+                res.status(503).json({
+                    error: 'Tabela de reset de senha não existe. Execute o script SQL: database/4_create_password_reset_tokens.sql'
+                });
+                return;
+            }
+            throw dbError;
+        }
         await client.query('COMMIT');
+        console.log('✅ [ForgotPassword] Transação commitada');
         // Envia email
         try {
+            console.log('📧 [ForgotPassword] Tentando enviar email...');
             await (0, email_1.sendPasswordResetEmail)(user.email, user.nome, token);
-            console.log(`Email de reset enviado para: ${user.email}`);
+            console.log(`✅ [ForgotPassword] Email enviado para: ${user.email}`);
         }
         catch (emailError) {
-            console.error('Erro ao enviar email:', emailError);
-            // Rollback se falhar ao enviar email
-            await client.query('ROLLBACK');
-            res.status(500).json({ error: 'Erro ao enviar email de recuperação' });
+            console.error('❌ [ForgotPassword] Erro ao enviar email:', emailError.message);
+            console.error('Stack:', emailError.stack);
+            // Não faz rollback pois o token já foi salvo
+            // Retorna erro específico
+            res.status(500).json({
+                error: 'Token criado mas erro ao enviar email. Verifique configurações de email no servidor.',
+                details: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+            });
             return;
         }
         res.status(200).json({
@@ -69,12 +106,21 @@ const forgotPassword = async (req, res) => {
         });
     }
     catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Erro em forgotPassword:', error);
-        res.status(500).json({ error: 'Erro ao processar solicitação' });
+        if (client) {
+            await client.query('ROLLBACK').catch(() => { });
+        }
+        console.error('❌ [ForgotPassword] Erro geral:', error.message);
+        console.error('Stack:', error.stack);
+        res.status(500).json({
+            error: 'Erro ao processar solicitação',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
     finally {
-        client.release();
+        if (client) {
+            client.release();
+            console.log('🔌 [ForgotPassword] Conexão liberada');
+        }
     }
 };
 exports.forgotPassword = forgotPassword;

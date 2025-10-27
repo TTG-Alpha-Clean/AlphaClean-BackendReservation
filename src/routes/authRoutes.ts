@@ -2,6 +2,7 @@
 import { Router } from "express";
 import * as auth from "../controllers/authController";
 import * as passwordReset from "../controllers/passwordResetController";
+import * as healthCheck from "../controllers/healthCheckController";
 
 const router = Router();
 
@@ -15,5 +16,8 @@ router.post("/logout", auth.logout);
 router.post("/forgot-password", passwordReset.forgotPassword);
 router.post("/reset-password", passwordReset.resetPassword);
 router.get("/verify-reset-token/:token", passwordReset.verifyResetToken);
+
+// Health check do sistema de reset
+router.get("/health-check-reset", healthCheck.healthCheckReset);
 
 export default router;
