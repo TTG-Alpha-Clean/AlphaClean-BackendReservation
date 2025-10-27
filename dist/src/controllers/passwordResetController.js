@@ -34,7 +34,7 @@ const forgotPassword = async (req, res) => {
         client = await database_1.pool.connect();
         console.log('✅ [ForgotPassword] Conexão com banco estabelecida');
         // Busca usuário pelo email
-        const userResult = await client.query('SELECT id, nome, email, active FROM usuarios WHERE email = $1', [email.toLowerCase().trim()]);
+        const userResult = await client.query('SELECT id, nome, email FROM usuarios WHERE email = $1', [email.toLowerCase().trim()]);
         console.log('🔍 [ForgotPassword] Usuário encontrado:', userResult.rows.length > 0);
         // Por segurança, sempre retorna sucesso (mesmo se email não existir)
         // Isso evita que atacantes descubram quais emails estão cadastrados
@@ -46,14 +46,6 @@ const forgotPassword = async (req, res) => {
             return;
         }
         const user = userResult.rows[0];
-        // Verifica se usuário está ativo
-        if (!user.active) {
-            console.log(`⚠️ [ForgotPassword] Usuário inativo: ${email}`);
-            res.status(200).json({
-                message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.',
-            });
-            return;
-        }
         // Gera token único e seguro
         const token = crypto_1.default.randomBytes(32).toString('hex');
         console.log('🔑 [ForgotPassword] Token gerado');

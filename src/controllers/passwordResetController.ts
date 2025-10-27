@@ -38,7 +38,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
 
     // Busca usuário pelo email
     const userResult = await client.query(
-      'SELECT id, nome, email, active FROM usuarios WHERE email = $1',
+      'SELECT id, nome, email FROM usuarios WHERE email = $1',
       [email.toLowerCase().trim()]
     );
 
@@ -55,15 +55,6 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     }
 
     const user = userResult.rows[0];
-
-    // Verifica se usuário está ativo
-    if (!user.active) {
-      console.log(`⚠️ [ForgotPassword] Usuário inativo: ${email}`);
-      res.status(200).json({
-        message: 'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.',
-      });
-      return;
-    }
 
     // Gera token único e seguro
     const token = crypto.randomBytes(32).toString('hex');
