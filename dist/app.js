@@ -35,6 +35,7 @@ const whatsapp_1 = __importDefault(require("./src/routes/whatsapp"));
 const carRoutes_1 = __importDefault(require("./src/routes/carRoutes"));
 const reports_1 = __importDefault(require("./src/routes/reports"));
 // services (WhatsApp será carregado dinamicamente)
+const autoFinalizacaoService_1 = require("./src/services/autoFinalizacaoService");
 // middlewares
 const notFound_1 = __importDefault(require("./src/middlewares/notFound"));
 const errorHandler_1 = __importDefault(require("./src/middlewares/errorHandler"));
@@ -196,6 +197,7 @@ app.use(errorHandler_1.default);
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
     try {
+        (0, autoFinalizacaoService_1.stopAutoFinalizacao)();
         await index_1.pool.end();
     }
     catch (error) {
@@ -206,6 +208,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
     try {
+        (0, autoFinalizacaoService_1.stopAutoFinalizacao)();
         await index_1.pool.end();
     }
     catch (error) {
@@ -223,6 +226,8 @@ if (process.env.VERCEL !== '1' && !module.parent) {
         console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
         // WhatsApp será inicializado via admin panel
         console.log('📱 WhatsApp disponível via admin panel');
+        // Iniciar serviço de auto-finalização de agendamentos
+        (0, autoFinalizacaoService_1.startAutoFinalizacao)();
     });
 }
 exports.default = app;

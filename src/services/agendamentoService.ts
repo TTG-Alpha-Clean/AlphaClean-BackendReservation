@@ -214,6 +214,7 @@ export async function list(filters: ListFilters) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -227,6 +228,7 @@ export async function list(filters: ListFilters) {
         : `
         SELECT
             a.*,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -276,6 +278,7 @@ export async function getByIdWithClientInfo(id: string, user: AuthUser): Promise
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -287,6 +290,7 @@ export async function getByIdWithClientInfo(id: string, user: AuthUser): Promise
         : `
         SELECT
             a.*,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a

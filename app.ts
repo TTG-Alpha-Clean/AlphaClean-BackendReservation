@@ -35,6 +35,7 @@ import carRoutes from "./src/routes/carRoutes";
 import reportRoutes from "./src/routes/reports";
 
 // services (WhatsApp será carregado dinamicamente)
+import { startAutoFinalizacao, stopAutoFinalizacao } from "./src/services/autoFinalizacaoService";
 
 // middlewares
 import notFound from "./src/middlewares/notFound";
@@ -218,6 +219,7 @@ app.use(errorHandler);
 process.on('SIGTERM', async () => {
     console.log('🔄 SIGTERM received, shutting down gracefully...');
     try {
+        stopAutoFinalizacao();
         await pool.end();
     } catch (error) {
         console.error('Error closing pool:', error);
@@ -228,6 +230,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     console.log('🔄 SIGINT received, shutting down gracefully...');
     try {
+        stopAutoFinalizacao();
         await pool.end();
     } catch (error) {
         console.error('Error closing pool:', error);
@@ -247,6 +250,9 @@ if (process.env.VERCEL !== '1' && !module.parent) {
 
         // WhatsApp será inicializado via admin panel
         console.log('📱 WhatsApp disponível via admin panel');
+
+        // Iniciar serviço de auto-finalização de agendamentos
+        startAutoFinalizacao();
     });
 }
 

@@ -148,6 +148,7 @@ async function list(filters) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -161,6 +162,7 @@ async function list(filters) {
         : `
         SELECT
             a.*,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -203,6 +205,7 @@ async function getByIdWithClientInfo(id, user) {
             u.nome as usuario_nome,
             u.email as usuario_email,
             CONCAT(t.ddd, t.numero) as usuario_telefone,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
@@ -214,6 +217,7 @@ async function getByIdWithClientInfo(id, user) {
         : `
         SELECT
             a.*,
+            s.id as servico_id,
             s.title as servico_nome,
             s.valor as servico_valor
         FROM agendamentos a
