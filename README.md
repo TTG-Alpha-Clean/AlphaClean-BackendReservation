@@ -645,6 +645,6 @@ Este projeto é privado e proprietário da Alpha Clean.
 
 **Desenvolvido com 💙 por:**
 
-[Leonardo França](https://github.com/Leofrancaa) • [Guilherme](https://github.com/guissx) • [Gustavo Cunha](https://github.com/GustavoCunh4) • [Gustavo Dias](https://github.com/GustavoD15) • [Maria Luiza Queiroz](https://github.com/marialuizaqueiroz)
+[Leonardo Franca](https://github.com/Leofrancaa) • [Gustavo Cabral](https://github.com/guissx) • [Luiz Gustavo Cunha](https://github.com/GustavoCunh4) • [Gustavo Diniz](https://github.com/GustavoD15) • [Maria Luiza Queiroz](https://github.com/marialuizaqueiroz)
 
 </div>
