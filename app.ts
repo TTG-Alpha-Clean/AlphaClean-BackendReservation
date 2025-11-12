@@ -58,9 +58,20 @@ const ALLOWED_ORIGINS = Array.from(new Set([...DEFAULT_ORIGINS, ...ENV_ORIGINS])
 const corsOptions = {
     origin(origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) {
         if (!origin) return cb(null, true); // server-to-server / curl
-        cb(null, ALLOWED_ORIGINS.includes(origin));
+
+        // Log para debug
+        console.log(`🔍 CORS Check - Origin: ${origin}, Allowed: ${ALLOWED_ORIGINS.includes(origin || '')}`);
+
+        if (ALLOWED_ORIGINS.includes(origin || '')) {
+            cb(null, true);
+        } else {
+            console.warn(`⚠️ Origin not allowed: ${origin}`);
+            cb(null, false);
+        }
     },
     credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 // ===== App =====
