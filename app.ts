@@ -208,6 +208,11 @@ app.get("/ping", async (req, res) => {
     }
 });
 
+// Handle OPTIONS requests (CORS preflight)
+app.options('*', (req, res) => {
+    res.status(200).end();
+});
+
 // Auth routes (rate limiting desabilitado temporariamente para testes)
 app.use("/auth", authRoutes);
 
