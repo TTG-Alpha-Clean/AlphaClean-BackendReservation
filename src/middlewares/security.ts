@@ -5,21 +5,17 @@ import { Request, Response, NextFunction } from 'express';
 
 // ✅ CONFIGURAÇÃO DO HELMET
 export const helmetConfig = helmet({
-    // Content Security Policy
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"],
-            upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
-        }
-    },
+    // Content Security Policy - Desabilitado para evitar conflitos com CORS
+    contentSecurityPolicy: false,
 
-    // Cross Origin Embedder Policy
+    // Cross Origin Embedder Policy - DESABILITADO para permitir CORS
     crossOriginEmbedderPolicy: false,
+
+    // Cross Origin Opener Policy - DESABILITADO para permitir CORS
+    crossOriginOpenerPolicy: false,
+
+    // Cross Origin Resource Policy - DESABILITADO para permitir CORS
+    crossOriginResourcePolicy: false,
 
     // Referrer Policy
     referrerPolicy: {
