@@ -5,7 +5,7 @@ import { pool } from '../database/index';
 /**
  * Serviço que finaliza automaticamente agendamentos que:
  * - Estão com status "agendado"
- * - Passaram mais de 1 dia da data do agendamento
+ * - Passaram mais de 5 horas da data/hora do agendamento
  *
  * IMPORTANTE: Esta finalização automática NÃO envia notificação via WhatsApp
  * Apenas finalizações manuais pelo admin devem enviar WhatsApp
@@ -15,7 +15,7 @@ let cronJob: cron.ScheduledTask | null = null;
 
 /**
  * Finaliza automaticamente agendamentos antigos
- * Roda todos os dias à meia-noite (00:00)
+ * Roda a cada hora para verificar agendamentos que passaram mais de 5 horas
  */
 export function startAutoFinalizacao() {
     // Se já existe um job rodando, não cria outro
@@ -26,18 +26,17 @@ export function startAutoFinalizacao() {
 
     console.log("🔄 Iniciando serviço de auto-finalização de agendamentos...");
 
-    // Executa todos os dias à meia-noite (00:00)
+    // Executa a cada hora (no minuto 0)
     // Formato: segundo minuto hora dia mês dia-da-semana
-    cronJob = cron.schedule('0 0 * * *', async () => {
+    cronJob = cron.schedule('0 * * * *', async () => {
         try {
             console.log("🔍 Verificando agendamentos para finalização automática...");
 
             // Buscar agendamentos que:
             // 1. Estão com status "agendado"
-            // 2. A data é de 1 dia atrás ou mais
-            const oneDayAgo = new Date();
-            oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-            const oneDayAgoStr = oneDayAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+            // 2. Passaram mais de 5 horas desde a data/hora do agendamento
+            const fiveHoursAgo = new Date();
+            fiveHoursAgo.setHours(fiveHoursAgo.getHours() - 5);
 
             const query = `
                 UPDATE agendamentos
@@ -46,11 +45,14 @@ export function startAutoFinalizacao() {
                     updated_at = NOW()
                 WHERE
                     status = 'agendado'
-                    AND data < $1
+                    AND (
+                        -- Concatena data e horário para comparar com timestamp
+                        (data::text || ' ' || horario::text)::timestamp < $1
+                    )
                 RETURNING id, usuario_id, modelo_veiculo, placa, data, horario
             `;
 
-            const result = await pool.query(query, [oneDayAgoStr]);
+            const result = await pool.query(query, [fiveHoursAgo]);
 
             if (result.rows.length > 0) {
                 console.log(`✅ ${result.rows.length} agendamento(s) finalizado(s) automaticamente:`);
@@ -67,7 +69,7 @@ export function startAutoFinalizacao() {
     });
 
     console.log("✅ Serviço de auto-finalização iniciado com sucesso");
-    console.log("📅 Próxima execução: todos os dias à meia-noite (00:00 BRT)");
+    console.log("📅 Execução: a cada hora, finalizando agendamentos com mais de 5 horas");
 
     // Executar imediatamente ao iniciar (opcional, para testar)
     // executeAutoFinalizacao();
@@ -91,9 +93,8 @@ export async function executeAutoFinalizacao() {
     try {
         console.log("🔍 Executando finalização automática manualmente...");
 
-        const oneDayAgo = new Date();
-        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-        const oneDayAgoStr = oneDayAgo.toISOString().split('T')[0];
+        const fiveHoursAgo = new Date();
+        fiveHoursAgo.setHours(fiveHoursAgo.getHours() - 5);
 
         const query = `
             UPDATE agendamentos
@@ -102,11 +103,14 @@ export async function executeAutoFinalizacao() {
                 updated_at = NOW()
             WHERE
                 status = 'agendado'
-                AND data < $1
+                AND (
+                    -- Concatena data e horário para comparar com timestamp
+                    (data::text || ' ' || horario::text)::timestamp < $1
+                )
             RETURNING id, usuario_id, modelo_veiculo, placa, data, horario
         `;
 
-        const result = await pool.query(query, [oneDayAgoStr]);
+        const result = await pool.query(query, [fiveHoursAgo]);
 
         if (result.rows.length > 0) {
             console.log(`✅ ${result.rows.length} agendamento(s) finalizado(s):`);
