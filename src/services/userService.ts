@@ -14,6 +14,22 @@ export async function getById(id: string): Promise<any> {
     return rows[0] || null;
 }
 
+export async function getUserPhone(userId: string): Promise<string | null> {
+    const { rows } = await pool.query(
+        'select ddd, numero from telefones where usuario_id = $1 limit 1',
+        [userId]
+    );
+
+    if (rows.length === 0) return null;
+
+    // Retorna o telefone formatado (com DDD se existir)
+    const { ddd, numero } = rows[0];
+    if (ddd) {
+        return `(${ddd}) ${numero}`;
+    }
+    return numero;
+}
+
 export async function list({ page = 1, page_size = 20, role }: any): Promise<any> {
     const where: string[] = [];
     const params: any[] = [];
