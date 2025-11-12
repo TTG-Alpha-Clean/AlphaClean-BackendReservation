@@ -120,26 +120,27 @@ app.get("/env-check", (req, res) => {
 });
 
 // ✅ MIDDLEWARES DE SEGURANÇA (ORDEM IMPORTANTE!)
+// CORS deve vir PRIMEIRO, antes de outros headers
+console.log("🌐 Applying CORS middleware...");
+app.use(cors(corsOptions));
+console.log("✅ CORS middleware applied");
+
 if (securityMiddlewares) {
     console.log("🔒 Applying security middlewares...");
-    // 1. Headers de segurança personalizados (primeiro)
-    app.use(securityMiddlewares.customSecurityHeaders);
-
-    // 2. Helmet para headers de segurança padrão
+    // 1. Helmet para headers de segurança padrão
     app.use(securityMiddlewares.helmetConfig);
 
-    // 3. CORS
-    app.use(cors(corsOptions));
+    // 2. Headers de segurança personalizados
+    app.use(securityMiddlewares.customSecurityHeaders);
 
-    // 4. Rate limiting geral
+    // 3. Rate limiting geral
     app.use(securityMiddlewares.generalLimiter);
 
-    // 5. Logging de segurança
+    // 4. Logging de segurança
     app.use(securityMiddlewares.securityLogger);
     console.log("✅ Security middlewares applied");
 } else {
     console.log("⚠️ Skipping security middlewares (failed to load)");
-    app.use(cors(corsOptions));
 }
 
 // 6. Parser do body
