@@ -12,10 +12,10 @@ interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 
-// Helper for UUID validation
-function isValidUuid(value: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(value);
+// Helper for ID validation (numeric)
+function isValidId(value: string): boolean {
+  const numericId = parseInt(value, 10);
+  return !isNaN(numericId) && numericId > 0;
 }
 
 // CREATE
@@ -49,8 +49,8 @@ export async function listServices(_req: Request, res: Response): Promise<Respon
 export async function getService(req: Request, res: Response): Promise<Response> {
   try {
     const id = req.params.id;
-    if (!isValidUuid(id)) {
-      return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
     }
 
     const service = await getServiceById(id);
@@ -68,8 +68,8 @@ export async function getService(req: Request, res: Response): Promise<Response>
 export async function editService(req: MulterRequest, res: Response): Promise<Response> {
   try {
     const id = req.params.id;
-    if (!isValidUuid(id)) {
-      return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
     }
 
     const updated = await updateService(id, req.body, req.file);
@@ -87,8 +87,8 @@ export async function editService(req: MulterRequest, res: Response): Promise<Re
 export async function removeService(req: Request, res: Response): Promise<Response> {
   try {
     const id = req.params.id;
-    if (!isValidUuid(id)) {
-      return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
     }
 
     const deleted = await deleteService(id);
@@ -106,8 +106,8 @@ export async function removeService(req: Request, res: Response): Promise<Respon
 export async function addServiceInformations(req: Request, res: Response): Promise<Response> {
   try {
     const serviceId = req.params.id;
-    if (!isValidUuid(serviceId)) {
-      return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+    if (!isValidId(serviceId)) {
+      return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
     }
 
     const { informations } = req.body;
