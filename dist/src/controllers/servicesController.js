@@ -40,10 +40,10 @@ exports.editService = editService;
 exports.removeService = removeService;
 exports.addServiceInformations = addServiceInformations;
 const servicesService_1 = require("../services/servicesService");
-// Helper for UUID validation
-function isValidUuid(value) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(value);
+// Helper for ID validation (numeric)
+function isValidId(value) {
+    const numericId = parseInt(value, 10);
+    return !isNaN(numericId) && numericId > 0;
 }
 // CREATE
 async function addService(req, res) {
@@ -76,8 +76,8 @@ async function listServices(_req, res) {
 async function getService(req, res) {
     try {
         const id = req.params.id;
-        if (!isValidUuid(id)) {
-            return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+        if (!isValidId(id)) {
+            return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
         }
         const service = await (0, servicesService_1.getServiceById)(id);
         if (!service) {
@@ -94,8 +94,8 @@ async function getService(req, res) {
 async function editService(req, res) {
     try {
         const id = req.params.id;
-        if (!isValidUuid(id)) {
-            return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+        if (!isValidId(id)) {
+            return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
         }
         const updated = await (0, servicesService_1.updateService)(id, req.body, req.file);
         if (!updated) {
@@ -112,8 +112,8 @@ async function editService(req, res) {
 async function removeService(req, res) {
     try {
         const id = req.params.id;
-        if (!isValidUuid(id)) {
-            return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+        if (!isValidId(id)) {
+            return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
         }
         const deleted = await (0, servicesService_1.deleteService)(id);
         if (!deleted) {
@@ -130,8 +130,8 @@ async function removeService(req, res) {
 async function addServiceInformations(req, res) {
     try {
         const serviceId = req.params.id;
-        if (!isValidUuid(serviceId)) {
-            return res.status(400).json({ error: 'ID inválido. Deve ser um UUID válido.' });
+        if (!isValidId(serviceId)) {
+            return res.status(400).json({ error: 'ID inválido. Deve ser um número positivo.' });
         }
         const { informations } = req.body;
         if (!Array.isArray(informations) || informations.length === 0) {

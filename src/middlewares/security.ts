@@ -12,13 +12,19 @@ export const helmetConfig = helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
+            // ✅ CORRIGIDO: imgSrc mais específico (permite Cloudinary e dados inline)
+            imgSrc: [
+                "'self'",
+                "data:",
+                "https://res.cloudinary.com",
+                "https://*.cloudinary.com"
+            ],
             connectSrc: ["'self'"],
             upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
         }
     },
 
-    // Cross Origin Embedder Policy
+    // Cross Origin Embedder Policy (mantido false para compatibilidade)
     crossOriginEmbedderPolicy: false,
 
     // Referrer Policy

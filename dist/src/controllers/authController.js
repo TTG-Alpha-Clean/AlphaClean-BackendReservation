@@ -94,11 +94,14 @@ exports.me = asyncHandler(async (req, res) => {
             res.status(401).json({ error: "Usuário não encontrado" });
             return;
         }
+        // Buscar telefone do usuário
+        const telefone = await userSvc.getUserPhone(payload.sub);
         res.json({
             user: {
                 id: user.id,
                 nome: user.nome,
                 email: user.email,
+                telefone: telefone || '',
                 role: user.role
             }
         });

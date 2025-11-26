@@ -59,9 +59,6 @@ const corsOptions = {
     origin(origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) {
         if (!origin) return cb(null, true); // server-to-server / curl
 
-        // Log para debug
-        console.log(`🔍 CORS Check - Origin: ${origin}, Allowed: ${ALLOWED_ORIGINS.includes(origin || '')}`);
-
         if (ALLOWED_ORIGINS.includes(origin || '')) {
             cb(null, true);
         } else {
@@ -133,8 +130,8 @@ if (securityMiddlewares) {
     // 2. Headers de segurança personalizados
     app.use(securityMiddlewares.customSecurityHeaders);
 
-    // 3. Rate limiting geral
-    app.use(securityMiddlewares.generalLimiter);
+    // 3. Rate limiting inteligente (aplica limiters específicos por rota)
+    app.use(securityMiddlewares.smartRateLimiter);
 
     // 4. Logging de segurança
     app.use(securityMiddlewares.securityLogger);
@@ -213,13 +210,16 @@ app.options('*', (req, res) => {
     res.status(200).end();
 });
 
-// Auth routes (rate limiting desabilitado temporariamente para testes)
+// ===== ROTAS COM RATE LIMITING APLICADO =====
+// O smartRateLimiter aplica automaticamente o limiter correto baseado na rota:
+// - /auth/login, /auth/register → authLimiter (5 req/15min)
+// - POST /api/* → createLimiter (10 req/10min)
+// - /agendamentos/slots → slotsLimiter (30 req/5min)
+// - /api/* → apiLimiter (60 req/min)
+// - Demais rotas → generalLimiter (100 req/15min)
+
 app.use("/auth", authRoutes);
-
-// Admin routes (rate limiting desabilitado temporariamente para testes)
 app.use("/admin", adminRoutes);
-
-// API routes (rate limiting desabilitado temporariamente para testes)
 app.use("/api/users", userRoutes);
 app.use("/api/agendamentos", agendamentosRoutes);
 app.use("/api/servicos", servicosRoutes);

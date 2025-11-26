@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.findByEmail = findByEmail;
 exports.getById = getById;
+exports.getUserPhone = getUserPhone;
 exports.list = list;
 exports.createUser = createUser;
 exports.addPhone = addPhone;
@@ -26,6 +27,17 @@ async function findByEmail(email) {
 async function getById(id) {
     const { rows } = await index_1.pool.query(`select id, nome, email, role, created_at, updated_at from usuarios where id=$1`, [id]);
     return rows[0] || null;
+}
+async function getUserPhone(userId) {
+    const { rows } = await index_1.pool.query('select ddd, numero from telefones where usuario_id = $1 limit 1', [userId]);
+    if (rows.length === 0)
+        return null;
+    // Retorna o telefone formatado (com DDD se existir)
+    const { ddd, numero } = rows[0];
+    if (ddd) {
+        return `(${ddd}) ${numero}`;
+    }
+    return numero;
 }
 async function list({ page = 1, page_size = 20, role }) {
     const where = [];
